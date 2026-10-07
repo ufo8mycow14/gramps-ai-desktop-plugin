@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*_verification.json
+verification.json
+bridge_source.json
+.codex/
+dist/
+*.pyc

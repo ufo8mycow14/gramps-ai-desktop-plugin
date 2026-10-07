@@ -1,0 +1,23 @@
+"""Small installed loader; implementation remains in the plugin checkout."""
+import importlib.util
+from pathlib import Path
+import json
+from gramps.gen.plug import Gramplet
+
+SOURCE = Path(json.loads(Path(__file__).with_name('bridge_source.json').read_text(encoding='utf-8'))['source'])
+if not SOURCE.is_absolute() or not SOURCE.is_file():
+    raise RuntimeError('Gramps Desktop plugin bridge source missing; rerun its installer from the current tools directory')
+_spec = importlib.util.spec_from_file_location('gramps_desktop_bridge', SOURCE)
+_bridge = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_bridge)
+
+
+def load_on_reg(dbstate, uistate, plugin):
+    _bridge.start(dbstate, uistate)
+    return []
+
+
+class DesktopControl(Gramplet):
+    def init(self):
+        instance = _bridge.start(self.dbstate, self.uistate)
+        self.set_text('Gramps Desktop plugin connected locally. Session: ' + instance.session[:12])

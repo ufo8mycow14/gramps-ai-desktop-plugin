@@ -1,0 +1,11 @@
+{
+  "name": "gramps-desktop",
+  "version": "2.1.2",
+  "description": "Control the installed Gramps desktop and open database.",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Gramps Desktop",
+    "shortDescription": "Gramps windows, records and genealogy workflows"
+  }
+}
