@@ -72,7 +72,7 @@ if __name__ == '__main__':
     if updated != text and not args.prepare_only:
         config.parent.mkdir(parents=True, exist_ok=True)
         config.write_text(updated, encoding='utf-8')
-    locator = {'source': str((args.tools / 'desktop_bridge.py').resolve()), 'version': '2.1.0'}
+    locator = {'source': str((args.tools / 'desktop_bridge.py').resolve()), 'version': '2.2.1'}
     (args.addon / 'bridge_source.json').write_text(json.dumps(locator, indent=2) + '\n', encoding='utf-8')
     transport = {'mcpServers': {'gramps_desktop': {'command': str(args.python.resolve()).replace('\\', '/'),
                  'args': ['server.py'], 'cwd': '.',

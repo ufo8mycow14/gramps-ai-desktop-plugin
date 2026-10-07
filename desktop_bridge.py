@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from gi.repository import Gtk, Gdk, GLib
 
 MAX_BODY = 1024 * 1024
-VERSION = '2.1.0'
+VERSION = '2.2.1'
 INSTANCE = None
 
 
@@ -176,6 +176,22 @@ class DesktopBridge:
         if isinstance(widget, Gtk.Notebook):
             result['page'] = widget.get_current_page()
             result['pages'] = [widget.get_tab_label_text(widget.get_nth_page(i)) for i in range(widget.get_n_pages())]
+        if isinstance(widget, Gtk.Actionable):
+            result['action_name'] = widget.get_action_name()
+            target = widget.get_action_target_value()
+            result['action_target'] = target.print_(True) if target is not None else None
+        if isinstance(widget, Gtk.ColorChooser):
+            result['colour'] = widget.get_rgba().to_string()
+        if isinstance(widget, Gtk.FontChooser):
+            result['font'] = widget.get_font()
+        if isinstance(widget, Gtk.Calendar):
+            year, month, day = widget.get_date()
+            result['date'] = {'year': year, 'month': month + 1, 'day': day}
+        if isinstance(widget, Gtk.FileChooser):
+            result.update(folder=widget.get_current_folder(), filenames=widget.get_filenames(),
+                          multiple=widget.get_select_multiple(), chooser_action=int(widget.get_action()))
+            if hasattr(widget, '_desktop_file_selection'):
+                result['file_selection'] = dict(widget._desktop_file_selection)
         alloc = widget.get_allocation()
         result['allocation'] = [alloc.x, alloc.y, alloc.width, alloc.height]
         return result
@@ -185,6 +201,19 @@ class DesktopBridge:
 
     def dispatch(self, method, a):
         from importlib.util import spec_from_file_location, module_from_spec
+        if method in ('menus', 'menu', 'cells') or (method == 'widget' and a.get('operation') in
+                ('edit_cell', 'choose_cell', 'toggle_cell', 'choose_files', 'set_folder', 'set_filename', 'set_color', 'set_font', 'set_calendar')):
+            if not hasattr(self, 'native_ui'):
+                spec = spec_from_file_location('gramps_desktop_ui', Path(__file__).with_name('ui_support.py'))
+                module = module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.native_ui = module.NativeUI(self)
+            if method == 'widget':
+                widget = self.resolve(a['widget_id'])
+                if not widget.is_sensitive():
+                    raise ValueError('Widget is disabled by Gramps')
+                return self.native_ui.widget(widget, a['operation'], a.get('value'))
+            return getattr(self.native_ui, method)(a)
         if method in ('capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
                       'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
                       'history', 'workflow', 'plugins', 'settings', 'rows', 'date'):
@@ -234,7 +263,13 @@ class DesktopBridge:
                 if not needle or needle in json.dumps(d, ensure_ascii=False).casefold():
                     items.append(d)
                 if depth < depth_limit and isinstance(w, Gtk.Container):
-                    pending.extend((c, d['id'], depth + 1) for c in reversed(w.get_children()))
+                    children = list(w.get_children())
+                    for getter in ('get_submenu', 'get_popup', 'get_popover'):
+                        if hasattr(w, getter):
+                            child = getattr(w, getter)()
+                            if child is not None and child not in children:
+                                children.append(child)
+                    pending.extend((c, d['id'], depth + 1) for c in reversed(children))
             return {'items': items[offset:offset + limit], 'total_matches': len(items),
                     'scan_truncated': bool(pending), 'next_offset': offset + limit if offset + limit < len(items) else None}
         if method == 'widget':
@@ -256,7 +291,8 @@ class DesktopBridge:
                     if not w.get_editable():
                         raise ValueError('Text view is not editable')
                     buf = w.get_buffer()
-                    if hasattr(buf.get_text(), 'get_tags'):
+                    from gramps.gui.widgets.styledtextbuffer import StyledTextBuffer
+                    if isinstance(buf, StyledTextBuffer):
                         from gramps.gen.lib import StyledText
                         buf.set_text(StyledText(value))
                     else:
@@ -268,9 +304,26 @@ class DesktopBridge:
                 else:
                     raise ValueError('set_text requires an Entry or TextView')
             elif op == 'set_value':
-                w.set_value(float(value))
+                import math
+                if not isinstance(w, (Gtk.Range, Gtk.SpinButton)) or type(value) not in (int, float) or not math.isfinite(value):
+                    raise ValueError('set_value requires a numeric Range or SpinButton value')
+                adjustment = w.get_adjustment()
+                upper = adjustment.get_upper() - adjustment.get_page_size()
+                if not adjustment.get_lower() <= value <= upper:
+                    raise ValueError('Value is outside the control bounds')
+                w.set_value(value)
             elif op == 'set_active':
-                w.set_active(bool(value) if isinstance(w, Gtk.ToggleButton) else int(value))
+                if isinstance(w, (Gtk.ToggleButton, Gtk.Switch, Gtk.CheckMenuItem)):
+                    if type(value) is not bool:
+                        raise ValueError('Toggle state must be a boolean')
+                elif isinstance(w, Gtk.ComboBox):
+                    model = w.get_model()
+                    count = model.iter_n_children(None) if model is not None else 0
+                    if type(value) is not int or not -1 <= value < count:
+                        raise ValueError('Combo index is outside its current choices')
+                else:
+                    raise ValueError('set_active requires a toggle, switch, menu check or ComboBox')
+                w.set_active(value)
             elif op == 'set_active_id':
                 if not isinstance(w, Gtk.ComboBox) or not isinstance(value, str):
                     raise ValueError('set_active_id requires a ComboBox and a string ID')
@@ -394,13 +447,16 @@ class DesktopBridge:
             if method == 'editor':
                 from gramps.gui.editors import EDITORS, CLASSES
                 name = classes[kind]
-                if name not in EDITORS:
-                    raise ValueError('Use the Tag menu or gramps_python for this record type')
                 if not a.get('new', False) and obj is None:
                     raise ValueError('Existing record not found')
                 if db.readonly:
                     raise ValueError('Gramps opened this tree read-only')
-                EDITORS[name](self.dbstate, self.uistate, [], CLASSES[name]() if a.get('new') else obj)
+                if kind == 'tag':
+                    from gramps.gui.views.tags import EditTag
+                    from gramps.gen.lib import Tag
+                    EditTag(db, self.uistate, [], Tag() if a.get('new') else obj)
+                else:
+                    EDITORS[name](self.dbstate, self.uistate, [], CLASSES[name]() if a.get('new') else obj)
                 return self.windows()
             from gramps.gen.display.name import displayer
             needle = a.get('query', '').casefold()

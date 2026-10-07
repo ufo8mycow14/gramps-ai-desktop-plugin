@@ -13,7 +13,8 @@ def main():
     root = Path(__file__).resolve().parent
     checks = []
     for name in ('server.py', 'desktop_bridge.py', 'support.py', 'configure.py',
-                 'DesktopControl.py', 'DesktopControl.gpr.py', 'package_release.py', 'verify_support.py'):
+                 'DesktopControl.py', 'DesktopControl.gpr.py', 'package_release.py', 'verify_support.py',
+                 'ui_support.py', 'verify_menu_support.py'):
         compile((root / name).read_text(encoding='utf-8'), name, 'exec')
     checks.append('source_compiles')
     manifest = json.loads((root / '.codex-plugin/plugin.json').read_text())
@@ -58,11 +59,11 @@ def main():
     assert replies[2]['error']['code'] == -32600
     assert replies[3]['id'] == 3 and replies[3]['result'] == {}
     tools = replies[4]['result']['tools']
-    assert len(tools) == 36 and len({t['name'] for t in tools}) == 36
+    assert len(tools) == 39 and len({t['name'] for t in tools}) == 39
     readme = (root / 'README.md').read_text(encoding='utf-8')
     assert all('`' + tool['name'] + '`' in readme for tool in tools)
     assert 'GNU GENERAL PUBLIC LICENSE' in (root / 'LICENSE').read_text()
-    checks.append('malformed_request_error_then_ping_and_36_documented_tools')
+    checks.append('malformed_request_error_then_ping_and_39_documented_tools')
     print(json.dumps({'passed': len(checks), 'checks': checks, 'family_data_access': False}))
 
 

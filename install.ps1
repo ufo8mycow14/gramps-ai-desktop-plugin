@@ -30,7 +30,7 @@ if (-not $Standalone -and -not (Get-Command codex -ErrorAction SilentlyContinue)
     throw 'Codex CLI with plugin commands is required, or use -Standalone for an MCP-only client.'
 }
 $pluginRoot = Join-Path $env:APPDATA ('gramps\gramps' + $GrampsVersion.Replace('.', '') + '\plugins\DesktopMCPControl')
-& $Python -m py_compile (Join-Path $PSScriptRoot 'server.py') (Join-Path $PSScriptRoot 'desktop_bridge.py') (Join-Path $PSScriptRoot 'support.py') (Join-Path $PSScriptRoot 'configure.py')
+& $Python -m py_compile (Join-Path $PSScriptRoot 'server.py') (Join-Path $PSScriptRoot 'desktop_bridge.py') (Join-Path $PSScriptRoot 'support.py') (Join-Path $PSScriptRoot 'ui_support.py') (Join-Path $PSScriptRoot 'configure.py')
 if ($LASTEXITCODE -ne 0) { throw 'Python compilation failed.' }
 foreach ($name in @('DesktopControl.py', 'DesktopControl.gpr.py')) {
     $source = Join-Path $PSScriptRoot $name

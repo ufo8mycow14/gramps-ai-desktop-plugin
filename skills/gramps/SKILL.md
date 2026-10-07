@@ -22,16 +22,27 @@ Choose the relevant route:
   within existing task authority. Use `family_member` for reciprocal family links.
   Preserve evidence/conflicts and identifiers. Finish native dialogs first.
   Re-read after a change; stale revisions must fail rather than overwrite edits.
-- Native application: inspect `windows`, `widgets`, `actions`, `views`, `rows` and `selection`
+- Native application: inspect `windows`, `widgets`, `menus`, `cells`, `actions`, `views`, `rows` and `selection`
   before operating observed IDs/actions. `editor` opens unsaved or existing native
   editing screens; Save/OK commits through Gramps. Cancel temporary test dialogs.
   `rows` also lists combo choices; `set_active_id` selects an observed choice.
   `select_rows` accepts several paths only when the control already permits it.
   `popup_menu` opens the control's native context menu; inspect its menu items.
+  `menus` exposes paths and targets. `menu` requires its current revision and the
+  same root/window IDs; headings lead to children. Widget-local action groups are
+  resolved from the popup's ancestry. `cells` exposes native renderer capabilities;
+  `edit_cell`/`choose_cell`/`toggle_cell` use observed row/column/renderer coordinates.
+  Select the visible notebook page before cell editing. Disabled cells are rejected.
+  File selection may be pending while GTK loads the directory: inspect its
+  `file_selection.state` and refreshed filenames before confirming the dialog.
+  File/folder, colour, font and calendar operations change the observed controls.
 - Reports, tools, import/export, backup, tree manager and add-ons: use `plugins`
   and `workflow`, then inspect the actual dialog. Opening it does not authorise
   its final file write, import, download or external upload. `settings` reads
   preferences; set only changes requested by the current task.
+  Report/tool IDs are normalised to native action names automatically. Some tools
+  write/process data or contact services inside their constructor; there is no
+  universal cancellable options screen. Read the tool's purpose before activation.
 - `history` reads or performs authorised native undo/redo. It affects the live
   application's shared history, including user edits.
 - `python` is a privileged fallback inside Gramps, with full local access. Never

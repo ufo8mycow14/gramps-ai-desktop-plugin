@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.2.1 — 7 October 2026
+
+- Expand the integration to 39 tools with native menu paths, targets, revisions
+  and table-cell discovery.
+- Resolve widget-local popup action groups and distinguish submenu headings.
+- Normalise report/tool IDs using Gramps' native action naming.
+- Complete native table text/combo editing lifecycles; reject disabled cells.
+- Add file/folder, colour, font and calendar control operations with readback.
+- Preserve invalid-input state for toggles, combo choices and calendar values.
+- Open the native tag editor, alongside the existing nine record editors.
+- Fix plain GTK text-buffer editing.
+- Check the added controls in an isolated instance of the installed GTK runtime.
+
 ## 2.1.2 — 7 October 2026
 
 First public release of the Gramps Desktop plugin.

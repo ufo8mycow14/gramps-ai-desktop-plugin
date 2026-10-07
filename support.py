@@ -161,10 +161,11 @@ class GrampsSupport:
 
     def dispatch(self, method, a):
         if method == 'capabilities':
-            return {'version': '2.1.0', 'kinds': KINDS, 'structured_methods': sorted(METHODS),
-                    'native_editors': list(KINDS)[:-1], 'merge_kinds': [k for k in KINDS if k != 'tag'],
+            return {'version': '2.2.1', 'kinds': KINDS, 'structured_methods': sorted(METHODS),
+                    'native_editors': list(KINDS), 'merge_kinds': [k for k in KINDS if k != 'tag'],
                     'writes': 'Native DbTxn with record revisions; preview unless apply=true',
                     'fallback': 'Native GTK controls/actions and privileged gramps_python',
+                    'native_menu_methods': ['menus', 'menu', 'cells'],
                     'limits': ['Installed Gramps 6.1 only', 'Add-on dependencies and external service access still apply',
                                'No automatic sync to the project master GEDCOM', 'No genealogical decision inferred from a match']}
         if method == 'schema':
@@ -364,10 +365,12 @@ class GrampsSupport:
             if op in names:
                 return self.bridge.dispatch('action', {'name': names[op]})
             if op in ('report', 'tool'):
-                return self.bridge.dispatch('action', {'name': a['action_name']})
+                from gramps.gui.uimanager import valid_action_name
+                return self.bridge.dispatch('action', {'name': valid_action_name(a['action_name'])})
             raise ValueError('Unknown workflow')
         if method == 'plugins':
             from gramps.gen.plug import PluginRegister
+            from gramps.gui.uimanager import valid_action_name
             register = PluginRegister.get_instance()
             group = a.get('kind', 'report')
             functions = {'report': 'report_plugins', 'tool': 'tool_plugins', 'import': 'import_plugins',
@@ -377,8 +380,15 @@ class GrampsSupport:
                 raise ValueError('Unsupported plugin group')
             items = getattr(register, functions[group])()
             window = self.bridge.uistate.window
-            return [{'id': p.id, 'name': p.name, 'version': p.version, 'description': p.description,
-                     'action_available': window.lookup_action(p.id) is not None} for p in items]
+            result = []
+            for p in items:
+                action_name = valid_action_name(p.id)
+                action = window.lookup_action(action_name)
+                result.append({'id': p.id, 'name': p.name, 'version': p.version, 'description': p.description,
+                               'action_name': action_name, 'action_available': action is not None,
+                               'action_enabled': action.get_enabled() if action else False,
+                               'supported': bool(getattr(p, 'supported', True))})
+            return result
         if method == 'settings':
             from gramps.gen.config import config
             if a.get('operation', 'get') == 'keys':

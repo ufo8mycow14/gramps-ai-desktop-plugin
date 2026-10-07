@@ -4,7 +4,7 @@ I built this plugin to let an MCP client work with the **running Gramps desktop*
 its windows, menus, native editors and already-open family tree. It combines a
 Gramps startup add-on with a Codex plugin and a dependency-free Python adapter.
 
-**Release: 2.1.2 · 36 tools · GPL-2.0-or-later**
+**Release: 2.2.1 · 39 tools · GPL-2.0-or-later**
 
 [Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
 · [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
@@ -18,9 +18,9 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. Gramps 6.0, Linux and macOS are not verified
 | Area | Supported operations | Scope |
 | --- | --- | --- |
 | Connection | Health, version/readiness diagnostics, session status and launching an explicitly located Gramps executable | Reuses the running bridge and open database |
-| Windows and menus | Discover windows, GTK widgets and native actions; activate menus and buttons; capture window screenshots | Observed window/widget IDs belong to one session |
-| Navigation and controls | Switch native views; read table rows and combo choices; read/set selections; multiple-row selection; notebook pages; text, toggles and native context menus | Operates supported GTK controls; individual add-on interfaces can differ |
-| Native editing screens | Open existing or unsaved people, families, events, places, sources, citations, repositories, media and notes | Uses normal Gramps editors and their Save/Cancel controls |
+| Windows and menus | Discover full native menu paths, targets, action scopes and enabled states; activate current menu paths and buttons; capture window screenshots | Covers main menus, GTK context menus and widget-local popups; stale menu revisions are rejected |
+| Navigation and controls | Switch native views; inspect/edit table cells and combo cells; read/set selections; notebook pages; text, toggles, numbers, dates, colours, fonts and file/folder choices | Uses native editor callbacks and control bounds; individual add-on interfaces can differ |
+| Native editing screens | Open existing or unsaved people, families, events, places, sources, citations, repositories, media, notes and tags | Uses normal Gramps editors and their Save/Cancel controls |
 | Structured records | Read schemas and named fields; search by text/field filters; create, update and delete native records | Ten record kinds, including tags; preview by default and revision checks for existing records |
 | Relationships | Read parents, partners and children; add/remove parent and child memberships | Reciprocal person/family updates in a transaction; ancestry-cycle checks |
 | References | Read outgoing links/backlinks; attach/detach citations, notes, tags, events, media, repository references and citation sources | Supported combinations follow native record schemas |
@@ -149,12 +149,35 @@ workflow dialog does not complete its final operation. Widget IDs expire when
 controls are destroyed; refresh discovery after UI changes. If an operation
 times out, query `gramps_job` using its returned ID before repeating it.
 
-## All 36 tools
+For menus, use `gramps_menus`, then pass the observed `path` and
+`expected_revision` to `gramps_menu`. Retain `root_id` for a context menu or
+widget-local popup. Submenu headings list children; they are not launch actions.
+Report/tool discovery exposes the actual normalised action name, including IDs
+containing underscores.
+
+For tables, use `gramps_cells` with the row path before editing. `edit_cell`
+accepts `{path, column, renderer, text}`; `choose_cell` uses `choice_path` from
+the observed combo choices; `toggle_cell` uses the same cell coordinates.
+Show the table and select its notebook page first. Disabled or hidden cells are
+rejected. Cell edits complete the native editing lifecycle.
+
+File controls support `choose_files`, `set_folder` and `set_filename`.
+Multiple selections use one directory. GTK loads directory contents asynchronously:
+inspect the returned `file_selection.state` and refreshed `filenames` before
+confirming a dialog. A `pending` receipt is not confirmed selection. Save-name
+selection does not itself write a file. Colour/font/calendar controls use
+`set_color`, `set_font` and `set_calendar`.
+
+Some Gramps tools process data, write files or contact services immediately in
+their constructor. Inspect a tool's purpose and apply the current task's authority
+before launching it; there is no universal safe options screen.
+
+## All 39 tools
 
 | Group | Tools |
 | --- | --- |
 | Connection | `gramps_launch`, `gramps_status`, `gramps_health`, `gramps_capabilities` |
-| Desktop | `gramps_windows`, `gramps_widgets`, `gramps_widget`, `gramps_actions`, `gramps_action`, `gramps_views`, `gramps_view`, `gramps_rows`, `gramps_selection`, `gramps_editor`, `gramps_screenshot`, `gramps_job`, `gramps_python` |
+| Desktop | `gramps_windows`, `gramps_widgets`, `gramps_widget`, `gramps_menus`, `gramps_menu`, `gramps_cells`, `gramps_actions`, `gramps_action`, `gramps_views`, `gramps_view`, `gramps_rows`, `gramps_selection`, `gramps_editor`, `gramps_screenshot`, `gramps_job`, `gramps_python` |
 | Records | `gramps_records`, `gramps_record`, `gramps_schema`, `gramps_object`, `gramps_find`, `gramps_mutate` |
 | Relationships and references | `gramps_relatives`, `gramps_links`, `gramps_family_member`, `gramps_attach` |
 | Merges | `gramps_compare`, `gramps_merge` |
@@ -185,11 +208,19 @@ automatically update an external GEDCOM or an online tree.
 
 - Verified desktop: Windows Gramps AIO64-6.1.0-beta2-1, GTK 3.24.52. The installer
   targets the Gramps 6.1 add-on folder and registration API.
-- The plugin package is **2.1.2**; the compatible adapter/bridge API is **2.1.0**.
+- The plugin package and adapter/bridge API are **2.2.1**.
 - Baseline verification covered **57 synthetic SQLite `:memory:` checks** and
   **19 live UI/MCP checks**. A further **13 focused rollout checks** covered
   configuration migration, diagnostics and disposable GTK controls. Local
-  installed-plugin discovery returned one server with 36 tools.
+  installed-plugin discovery returned one server with 36 tools for the earlier release.
+- The 2.2 menu/control expansion passed **33 isolated GTK control checks** using
+  the installed Gramps runtime. These cover native editor lifecycles, popup action
+  scopes, multi-file selection, calendar/colour/font controls and rejected inputs.
+  Read-only discovery resolved all **155 actionable menu entries**, **55 GUI tools**
+  and **62 GUI reports** in the installed configuration. This measures action
+  routing, not successful final execution of all those workflows.
+- Eight additional native dialog checks used synthetic in-memory data: the tag
+  editor, four audited tools and three text-report option screens, all cancelled.
 - Public packaging also has a portable `verify_package.py` check. These checks
   do not establish universal compatibility or a security audit.
 - Live editor/workflow checks cancelled temporary dialogs. Structured writes
@@ -197,6 +228,10 @@ automatically update an external GEDCOM or an online tree.
 - Third-party add-ons, custom widget types, online services and external report
   dependencies are not universally tested. Discovery or opening a dialog is not
   a guarantee that its final workflow will succeed.
+- Existing add-on defects remain their own dependencies: the tested installation's
+  Html View lacks its GTK HTML component. Static inspection found legacy PhpGedView
+  and Rebuild Types constructor contracts incompatible with the current dispatcher.
+  The plugin does not replace their implementations.
 - No bundled web-tree service, hosted endpoint, automatic online synchronisation
   or automatic genealogical adjudication is provided.
 - Only one connected Gramps process per user discovery location is supported.
@@ -212,6 +247,9 @@ This checks packaging, configuration migration and the stdio protocol without
 launching Gramps or reading a family tree. For developers, `verify_support.py`
 tests native structured operations using a synthetic in-memory database inside
 an already connected Gramps process; it requires trusted Python tool access.
+`verify_menu_support.py` checks disposable native controls and read-only action
+mapping. Run development checks with unsaved work closed; native runtime failures
+can terminate the application.
 
 ## Troubleshooting and removal
 

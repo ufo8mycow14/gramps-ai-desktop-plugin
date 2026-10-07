@@ -11,7 +11,7 @@ import urllib.request
 
 RUNTIME = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'GrampsDesktopMCP' / 'connection.json'
 DEFAULT_EXE = os.environ.get('GRAMPS_EXECUTABLE', '')
-VERSION = '2.1.0'
+VERSION = '2.2.1'
 
 
 def schema(properties=None, required=None):
@@ -53,6 +53,18 @@ tool('widget', 'Operate a discovered GTK control. Editing text changes the dialo
       'select_tab', 'select_row', 'select_rows', 'activate_row', 'set_active_id', 'popup_menu', 'focus',
       'close', 'show', 'hide', 'resize', 'move', 'choose_file', 'response']},
       'value': {}}, ['widget_id', 'operation'])
+
+TOOLS[-1]['inputSchema']['properties']['operation']['enum'].extend([
+    'edit_cell', 'choose_cell', 'toggle_cell', 'choose_files', 'set_folder', 'set_filename', 'set_color', 'set_font', 'set_calendar'])
+tool('menus', 'Read native menu paths, action scopes, parameters, enabled state and revision. '
+     'Defaults to the main menu; root_id may identify an observed popup/menu control.',
+     {'window_id': string(), 'root_id': string(), 'query': string(), 'offset': integer(), 'limit': integer()}, readonly=True)
+tool('menu', 'Activate an observed menu path with its native target parameter. Requires the current menu revision. '
+     'Some tools execute immediately; apply task authority before activating them.',
+     {'window_id': string(), 'root_id': string(), 'path': string(), 'expected_revision': string()}, ['path', 'expected_revision'])
+tool('cells', 'Inspect TreeView column/renderers, editability, toggle state and combo choices for an optional row path. '
+     'Use widget edit_cell/toggle_cell only for authorised edits through native signals.',
+     {'widget_id': string(), 'path': string()}, ['widget_id'], True)
 tool('actions', 'List Gramps menu/application actions and whether each is enabled.',
      {'window_id': string(), 'scope': {'type': 'string', 'enum': ['win', 'app']}}, readonly=True)
 tool('action', 'Activate an enabled Gramps menu action. Use actions first. Import/export, reports, tools, '
