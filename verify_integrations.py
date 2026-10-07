@@ -343,6 +343,97 @@ def native():
             check('filter_native_delete_preserves_backup', not call('filter', operation='list', kind='person', store_path=store)['filters'] and
                   Path(deleted['backup_path']).is_file())
             report_id = 'summary'
+            export_formats = call('export', operation='list')
+            check('export_native_format_discovery', {item['format'] for item in export_formats['formats']} == {'gramps', 'xml', 'gedcom', 'gpkg'})
+            import gzip
+            import tarfile
+            import xml.etree.ElementTree as ET
+            for export_format, extension in (('gramps', 'gramps'), ('xml', 'xml'), ('gedcom', 'ged')):
+                export_args = {'operation': 'run', 'format': export_format, 'output_path': str(folder / ('synthetic.' + extension))}
+                export_preview = call('export', **export_args)
+                check('export_' + export_format + '_preview_no_write', not Path(export_args['output_path']).exists() and not export_preview['applied'])
+                exported = call('export', **export_args, apply=True, expected_plan=export_preview['plan_revision'])
+                raw = Path(export_args['output_path']).read_bytes()
+                if export_format == 'gramps':
+                    raw = gzip.decompress(raw)
+                check('export_' + export_format + '_native_output', exported['applied'] and bool(exported['sha256']) and
+                      (b'0 TRLR' in raw if export_format == 'gedcom' else ET.fromstring(raw).tag.endswith('database')))
+            package_args = {'operation': 'backup', 'include_media': True, 'output_path': str(folder / 'synthetic.gpkg')}
+            package_preview = call('export', **package_args)
+            packaged = call('export', **package_args, apply=True, expected_plan=package_preview['plan_revision'])
+            with tarfile.open(package_args['output_path']) as archive:
+                archive_names = archive.getnames()
+                check('backup_native_xml_and_portable_media_members', 'data.gramps' in archive_names and
+                      set(archive_names) == {'data.gramps'} | {item['archive_path'] for item in packaged['media']} and
+                      all(not Path(name).is_absolute() and '..' not in Path(name).parts for name in archive_names))
+                xml = ET.fromstring(archive.extractfile('data.gramps').read())
+                media_paths = [item.get('src') for item in xml.iter() if item.tag.endswith('file')]
+                check('backup_xml_references_packaged_media', set(media_paths) == {item['archive_path'] for item in packaged['media']})
+            check('backup_preserves_original_media', file.read_text(encoding='utf-8') == 'Synthetic media metadata fixture' and
+                  read('media', media['handle'])['data']['path'] == str(file))
+            from gramps.plugins.importer import importxml
+            from gramps.cli.user import User
+            restored_db = SQLite()
+            restored_db.load(':memory:')
+            try:
+                restored_path = folder / 'restore-test.gramps'
+                with tarfile.open(package_args['output_path']) as archive:
+                    restored_path.write_bytes(archive.extractfile('data.gramps').read())
+                restored = importxml.importData(restored_db, str(restored_path), User(quiet=True))
+                check('backup_native_restore_roundtrip', restored and
+                      restored_db.get_person_from_handle(person['handle']).get_gramps_id() == person['gramps_id'] and
+                      restored_db.get_media_from_handle(media['handle']).get_path() == packaged['media'][0]['archive_path'])
+            finally:
+                restored_db.close()
+            protected = folder / 'referenced.xml'
+            protected.write_bytes(b'Referenced source must remain unchanged')
+            create('media', {'path': str(protected)})
+            reject('export_cannot_replace_referenced_source', lambda: call('export', operation='run', format='xml',
+                   output_path=str(protected), overwrite=True))
+            reject('report_cannot_replace_referenced_source', lambda: call('report', operation='run', report_id='summary',
+                   format='txt', output_path=str(file), overwrite=True))
+            overwrite_package = {**package_args, 'overwrite': True}
+            overwrite_package_preview = call('export', **overwrite_package)
+            file.write_text('Changed synthetic media', encoding='utf-8')
+            reject('backup_changed_media_rejects_review', lambda: call('export', **overwrite_package,
+                   apply=True, expected_plan=overwrite_package_preview['plan_revision']))
+            file.unlink()
+            missing_args = {**package_args, 'output_path': str(folder / 'missing.gpkg')}
+            reject('backup_missing_media_rejected_by_default', lambda: call('export', **missing_args))
+            missing_preview = call('export', **missing_args, allow_missing_media=True)
+            check('backup_explicit_missing_media_receipt', not missing_preview['media_complete'] and missing_preview['missing_media'] == [media['handle']])
+            call('export', **missing_args, allow_missing_media=True, apply=True, expected_plan=missing_preview['plan_revision'])
+            with tarfile.open(missing_args['output_path']) as archive:
+                incomplete_xml = ET.fromstring(archive.extractfile('data.gramps').read())
+                check('backup_missing_media_path_retained', str(file).replace('\\', '/') in [item.get('src') for item in incomplete_xml.iter() if item.tag.endswith('file')])
+            file.write_text('Synthetic media metadata fixture', encoding='utf-8')
+            remote_media = create('media', {'path': 'https://example.invalid/synthetic-media.png'})
+            remote_args = {**package_args, 'output_path': str(folder / 'remote.gpkg'), 'allow_missing_media': True}
+            remote_preview = call('export', **remote_args)
+            call('export', **remote_args, apply=True, expected_plan=remote_preview['plan_revision'])
+            with tarfile.open(remote_args['output_path']) as archive:
+                remote_xml = ET.fromstring(archive.extractfile('data.gramps').read())
+                check('backup_remote_url_retained_without_download', remote_media['handle'] in remote_preview['missing_media'] and
+                      'https://example.invalid/synthetic-media.png' in [item.get('src') for item in remote_xml.iter() if item.tag.endswith('file')])
+            reject('export_requires_review_plan', lambda: call('export', operation='backup', output_path=str(folder / 'unchecked.gramps'), apply=True))
+            reject('export_existing_output_rejected', lambda: call('export', operation='run', format='xml', output_path=str(folder / 'synthetic.xml')))
+            from gramps.plugins.export import exportxml
+            original_xml_write = exportxml.XmlWriter.write
+            existing_export = folder / 'synthetic.xml'
+            export_before = existing_export.read_bytes()
+            overwrite_export = {'operation': 'run', 'format': 'xml', 'output_path': str(existing_export), 'overwrite': True}
+            overwrite_export_preview = call('export', **overwrite_export)
+            def failed_xml_write(writer, filename):
+                original_xml_write(writer, filename)
+                raise RuntimeError('Injected exporter failure after staged output')
+            exportxml.XmlWriter.write = failed_xml_write
+            try:
+                reject('export_generation_failure_reported', lambda: call('export', **overwrite_export,
+                       apply=True, expected_plan=overwrite_export_preview['plan_revision']))
+            finally:
+                exportxml.XmlWriter.write = original_xml_write
+            check('export_failure_preserves_output_and_no_backup_sidefile', existing_export.read_bytes() == export_before and
+                  not (folder / 'synthetic.xml.bak').exists() and not list(folder.glob('.synthetic.*')))
             options = call('report', operation='options', report_id=report_id)
             check('report_native_options_formats', any(item['format'] == 'txt' for item in options['formats']))
             output = folder / 'summary.txt'
@@ -444,7 +535,138 @@ def native():
             reject('report_invalid_document_option_choice_rejected', lambda: call('report', operation='options', report_id='ancestor_chart',
                    format='svg', document_options={'svg_background': 'invisible'}))
             reject('report_html_requires_bundle', lambda: call('report', **{**html_args, 'bundle': False, 'output_path': str(folder / 'plain.html')}))
-            reject('report_latex_requires_media_isolation', lambda: call('report', **{**args, 'format': 'tex', 'output_path': str(folder / 'summary.tex')}))
+            reject('report_latex_requires_bundle', lambda: call('report', **{**args, 'format': 'tex', 'output_path': str(folder / 'summary.tex')}))
+            from gi.repository import GdkPixbuf
+            image_path = folder / 'synthetic-image.png'
+            image_fixture = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, 20, 40)
+            image_fixture.fill(0x0a141e64)
+            image_fixture.savev(str(image_path), 'png', [], [])
+            source_bytes = image_path.read_bytes()
+            existing_jpeg = image_path.with_suffix('.jpg')
+            existing_jpeg.write_bytes(b'Existing sibling must remain unchanged')
+            image_media = create('media', {'path': str(image_path), 'mime': 'image/png'})
+            current_person = read('person', person['handle'])
+            call('attach', kind='person', handle=person['handle'], expected_revision=current_person['revision'],
+                 target_kind='media', target_handle=image_media['handle'], apply=True)
+            class ImageReport(original_report):
+                def write_report(self):
+                    super().write_report()
+                    self.doc.add_media(str(image_path), 0, 4, 4, crop=(0, 0, 50, 100))
+                    self.doc.add_media(str(image_path), 0, 4, 4, crop=(0, 0, 50, 100))
+                    self.doc.add_media(str(image_path), 0, 4, 4)
+            setattr(report_module, pdata.reportclass, ImageReport)
+            latex_args = {**args, 'format': 'tex', 'output_path': str(folder / 'latex-bundle/summary.tex'), 'bundle': True}
+            try:
+                latex_preview = call('report', **latex_args)
+                latex_result = call('report', **latex_args, apply=True, expected_plan=latex_preview['plan_revision'])
+            finally:
+                setattr(report_module, pdata.reportclass, original_report)
+            tex = Path(latex_args['output_path']).read_text(encoding='utf-8')
+            assets = list(Path(latex_args['output_path']).parent.glob('media/*.jpg'))
+            check('report_native_latex_with_portable_image_assets', b'\\documentclass' in Path(latex_args['output_path']).read_bytes() and
+                  len(assets) == 2 and all('media/' + image.name in tex for image in assets) and str(folder) not in tex and
+                  len(latex_result['artifacts']) == 3)
+            derived_images = [GdkPixbuf.Pixbuf.new_from_file(str(asset)) for asset in assets]
+            check('report_rgba_and_crop_preserved_in_derived_assets', {(image.get_width(), image.get_height()) for image in derived_images} == {(20, 40), (10, 40)} and
+                  all(not image.get_has_alpha() for image in derived_images))
+            check('report_original_and_sibling_jpeg_preserved', image_path.read_bytes() == source_bytes and
+                  existing_jpeg.read_bytes() == b'Existing sibling must remain unchanged')
+            portrait_path = folder / 'synthetic-portrait.bmp'
+            image_fixture.savev(str(portrait_path), 'bmp', [], [])
+            portrait_bytes = portrait_path.read_bytes()
+            create('media', {'path': str(portrait_path), 'mime': 'image/bmp'})
+            class PortraitReport(original_report):
+                def write_report(self):
+                    super().write_report()
+                    self.doc.add_media(str(portrait_path), 0, 4, 4, crop=(0, 0, 50, 100))
+                    self.doc.add_media(str(portrait_path), 0, 4, 4, crop=(0, 0, 50, 100))
+            setattr(report_module, pdata.reportclass, PortraitReport)
+            portrait_args = {**latex_args, 'output_path': str(folder / 'portrait-bundle/summary.tex')}
+            try:
+                portrait_preview = call('report', **portrait_args)
+                call('report', **portrait_args, apply=True, expected_plan=portrait_preview['plan_revision'])
+            finally:
+                setattr(report_module, pdata.reportclass, original_report)
+            portrait_tex = Path(portrait_args['output_path']).read_text(encoding='utf-8')
+            check('report_non_jpeg_portrait_sizing_and_cached_asset', portrait_tex.count('}{4}{8.0}{') == 2 and
+                  len(list(Path(portrait_args['output_path']).parent.glob('media/*.jpg'))) == 1)
+            check('report_non_jpeg_original_preserved', portrait_path.read_bytes() == portrait_bytes and
+                  not portrait_path.with_suffix('.jpg').exists())
+            stale_image_args = {**latex_args, 'output_path': str(folder / 'stale-image-bundle/summary.tex')}
+            stale_image_preview = call('report', **stale_image_args)
+            image_fixture.fill(0x323c4664)
+            image_fixture.savev(str(image_path), 'png', [], [])
+            reject('report_source_image_changes_invalidate_preview', lambda: call('report', **stale_image_args, apply=True,
+                   expected_plan=stale_image_preview['plan_revision']))
+            check('report_image_staleness_creates_no_bundle', not Path(stale_image_args['output_path']).parent.exists())
+            image_path.write_bytes(source_bytes)
+            pdf_image_args = {**args, 'format': 'pdf', 'output_path': str(folder / 'image-state.pdf')}
+            pdf_image_preview = call('report', **pdf_image_args)
+            image_fixture.fill(0x323c4664)
+            image_fixture.savev(str(image_path), 'png', [], [])
+            reject('report_pdf_source_image_changes_invalidate_preview', lambda: call('report', **pdf_image_args, apply=True,
+                   expected_plan=pdf_image_preview['plan_revision']))
+            image_path.write_bytes(source_bytes)
+            import report_media
+            from gramps.gen.plug.docgen import treedoc, PaperStyle
+            from gramps.gen.plug.report._paper import paper_sizes
+            from gramps.gen.plug.report import MenuReportOptions
+            class TreeFixtureOptions(MenuReportOptions):
+                def add_menu_options(self, menu):
+                    pass
+            tree_options = TreeFixtureOptions('synthetic-tree-generator', db)
+            treedoc.TreeOptions().add_menu_options(tree_options.menu)
+            paper = next(paper for paper in paper_sizes if paper.get_name() == 'A4')
+            tree_bundle = folder / 'tree-bundle'
+            tree_bundle.mkdir()
+            tree_doc = treedoc.TreeTexDoc(tree_options, PaperStyle(paper, 0, 1, 1, 1, 1))
+            report_media.configure(tree_doc, tree_bundle, report_media.inputs(db), category_tree=True)
+            original_tree_write = tree_doc.write
+            tree_doc.open(str(tree_bundle / 'tree.tex'))
+            tree_doc.write_node(db, 1, 'g', db.get_person_from_handle(person['handle']), False)
+            tree_doc.close()
+            tree_text = (tree_bundle / 'tree.tex').read_text(encoding='utf-8')
+            tree_assets = list(tree_bundle.glob('media/*.png'))
+            check('report_tree_native_source_and_private_thumbnail', len(tree_assets) == 1 and
+                  'media/' + tree_assets[0].name in tree_text and str(folder) not in tree_text and
+                  max(GdkPixbuf.Pixbuf.new_from_file(str(tree_assets[0])).get_width(), GdkPixbuf.Pixbuf.new_from_file(str(tree_assets[0])).get_height()) == 96)
+            check('report_tree_preserves_person_media_and_restores_hook', len(db.get_person_from_handle(person['handle']).get_media_list()) == 1 and
+                  tree_doc.write == original_tree_write and image_path.read_bytes() == source_bytes)
+            original_write = tree_doc.write
+            def fail_tree_write(*arguments):
+                raise RuntimeError('Injected tree rendering failure')
+            tree_doc.write = fail_tree_write
+            reject('report_tree_render_failure_propagates', lambda: tree_doc.write_node(db, 1, 'g', db.get_person_from_handle(person['handle']), False))
+            check('report_tree_failure_restores_document_hook', tree_doc.write == fail_tree_write)
+            tree_doc.write = original_write
+            native_report_list, native_load_plugin = manager.get_reg_reports, manager.load_plugin
+            from gramps.gen.plug.report import CATEGORY_TREE
+            tree_plugin = SimpleNamespace(id='synthetic-tree-source', name='Synthetic native tree fixture', description='Synthetic only',
+                                          category=CATEGORY_TREE,
+                                          optionclass='Options', reportclass='Report')
+            class TreeFixtureReport:
+                def __init__(self, database, options, user):
+                    self.db, self.doc = database, options.handler.doc
+                    self.output = options.handler.output
+                def begin_report(self):
+                    self.doc.open(self.output)
+                def write_report(self):
+                    self.doc.write_node(self.db, 1, 'g', self.db.get_person_from_handle(person['handle']), False)
+                def end_report(self):
+                    self.doc.close()
+            fixture_module = SimpleNamespace(Options=TreeFixtureOptions, Report=TreeFixtureReport)
+            manager.get_reg_reports = lambda gui=False: native_report_list(gui=gui) + ([] if gui else [tree_plugin])
+            manager.load_plugin = lambda plugin: fixture_module if plugin is tree_plugin else native_load_plugin(plugin)
+            try:
+                for tree_format in ('tex', 'graph'):
+                    tree_args = {'operation': 'run', 'report_id': tree_plugin.id, 'format': tree_format, 'bundle': True,
+                                 'output_path': str(folder / ('native-tree-' + tree_format) / ('tree.' + tree_format))}
+                    preview_tree = call('report', **tree_args)
+                    output_tree = call('report', **tree_args, apply=True, expected_plan=preview_tree['plan_revision'])
+                    check('report_tree_' + tree_format + '_dispatch_bundle', output_tree['applied'] and
+                          len(output_tree['artifacts']) == 2 and 'media/' in Path(tree_args['output_path']).read_text(encoding='utf-8'))
+            finally:
+                manager.get_reg_reports, manager.load_plugin = native_report_list, native_load_plugin
             import report_output
             stage = folder / 'publication-stage'
             stage.mkdir()
@@ -464,7 +686,7 @@ def native():
             check('report_bundle_failure_cleans_only_owned_output', not destination.exists() and (stage / 'asset.css').is_file())
             from gramps.gen.plug.report import CATEGORY_GRAPHVIZ, CATEGORY_TREE
             reports = call('report', operation='list')['reports']
-            check('report_tree_automation_restriction_advertised', all(not item['automatable'] for item in reports if item['category'] == CATEGORY_TREE))
+            check('report_tree_source_automation_advertised', all(item['automatable'] for item in reports if item['category'] == CATEGORY_TREE))
             for category, name in ((CATEGORY_GRAPHVIZ, 'graphviz'), (CATEGORY_TREE, 'tree')):
                 candidates = [item for item in reports if item['automatable'] and item['category'] == category]
                 if candidates:

@@ -15,7 +15,7 @@ KINDS = {'person': 'Person', 'family': 'Family', 'event': 'Event', 'place': 'Pla
 METHODS = {'capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
            'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
            'history', 'workflow', 'plugins', 'settings', 'rows', 'date',
-           'filter', 'report', 'batch', 'batch_attach', 'batch_file', 'media_manage', 'sync_apply', 'sync_refs'}
+           'filter', 'report', 'export', 'batch', 'batch_attach', 'batch_file', 'media_manage', 'sync_apply', 'sync_refs'}
 
 
 def revision(data):
@@ -169,7 +169,7 @@ class GrampsSupport:
                 spec.loader.exec_module(module)
                 self.batches = module.BatchSupport(self, decode, merge_patch, revision)
             return getattr(self.batches, {'batch': 'batch', 'batch_attach': 'attachments', 'batch_file': 'files'}[method])(a)
-        if method in ('filter', 'report', 'media_manage', 'sync_apply', 'sync_refs'):
+        if method in ('filter', 'report', 'export', 'media_manage', 'sync_apply', 'sync_refs'):
             if not hasattr(self, 'workflows'):
                 from importlib.util import spec_from_file_location, module_from_spec
                 spec = spec_from_file_location('gramps_desktop_workflows', Path(__file__).with_name('workflow_support.py'))

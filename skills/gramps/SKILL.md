@@ -50,10 +50,21 @@ Choose the relevant route:
   Existing output needs explicit overwrite. Generation stages output and returns
   size/hash; non-automatable categories use native `open` dialogs.
   Select observed paper/orientation/margins/style/CSS through `document` and
-  generator choices through `document_options`. HTML/SVG require bundle=true
+  generator choices through `document_options`. HTML/SVG/tex/graph require bundle=true
   inside a new directory under an existing parent; retain the file manifest.
-  Existing bundles cannot be overwritten. Automatic LaTeX/tree generation is
-  restricted pending source-media isolation; use its native dialog.
+  Existing bundles cannot be overwritten. Image bytes are bound to the preview.
+  LaTeX/tree sources use private derived images and portable references; they
+  do not compile. Automatic tree PDF needs a confined compiler and remains
+  restricted; use its native dialog. Individual tree add-ons are unverified.
+- Exports/backups: `export` lists installed supported formats; preview whole-tree
+  XML/compressed XML/GEDCOM/gpkg output with an absolute destination and apply
+  with `expected_plan`. Includes private/living records without filtering.
+  Backup defaults to native XML; include_media selects a portable gpkg package
+  with reviewed original paths and hashes. Reject missing/remote media unless
+  explicitly allowing an incomplete package; retain its missing-media receipt.
+  Remote media is never fetched. Existing files require overwrite; preserve
+  source media/native database paths. GEDCOM can lose native details; XML/media
+  backups support restoration but do not include profile/add-ons/undo history.
 - Media management: inspect scoped `media_manage` metadata/missing paths and
   search explicit directories for candidates. Review identity before relinking
   existing files with current revisions and `expected_plan`; retain the batch

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.6.0 — 7 October 2026
+
+- Add `gramps_export`, bringing the plugin to 48 tools: reviewed native XML,
+  compressed XML, GEDCOM and XML/media-package exports, plus explicit backups.
+- Stage output and bind records, tree metadata, destinations and package media.
+  Preserve source media and native database directories. Portable packages use
+  safe relative members; missing/remote media requires explicit incomplete
+  backup authority and retains its original record path/URL.
+- Enable bundled LaTeX and tree-source generation using private JPEG/thumbnail
+  assets, native crop semantics and relative references. Preserve source images,
+  sibling files and Gramps' shared thumbnail cache. Bind image bytes for all reports.
+- Keep automatic tree PDF restricted pending a confined external compiler.
+  Source exports do not execute a compiler; native dialogs remain available.
+- Verify native export output/restoration, image-preservation/staleness and tree
+  source dispatch on synthetic registrations. Individual tree add-ons, live Web
+  and other GTK hosts remain unverified.
+
 ## 2.5.0 — 7 October 2026
 
 - Add `gramps_batch_attach` and `gramps_batch_file`, bringing the plugin to 47

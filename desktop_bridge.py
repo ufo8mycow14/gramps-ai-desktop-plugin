@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from gi.repository import Gtk, Gdk, GLib
 
 MAX_BODY = 1024 * 1024
-VERSION = '2.5.0'
+VERSION = '2.6.0'
 INSTANCE = None
 
 
@@ -225,7 +225,7 @@ class DesktopBridge:
         if method in ('capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
                       'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
                       'history', 'workflow', 'plugins', 'settings', 'rows', 'date',
-                      'filter', 'report', 'batch', 'batch_attach', 'batch_file', 'media_manage', 'sync_apply', 'sync_refs'):
+                      'filter', 'report', 'export', 'batch', 'batch_attach', 'batch_file', 'media_manage', 'sync_apply', 'sync_refs'):
             if not hasattr(self, 'support'):
                 spec = spec_from_file_location('gramps_desktop_support', Path(__file__).with_name('support.py'))
                 module = module_from_spec(spec)

@@ -129,7 +129,7 @@ def dispatch(workflow, a):
     if op == 'list':
         return {'reports': [{'id': p.id, 'name': p.name, 'description': p.description,
                               'category': p.category, 'automatable': p.id in cli_reports and
-                              p.category in (CATEGORY_TEXT, CATEGORY_DRAW, CATEGORY_GRAPHVIZ)}
+                              p.category in (CATEGORY_TEXT, CATEGORY_DRAW, CATEGORY_GRAPHVIZ, CATEGORY_TREE)}
                              for p in all_reports.values()]}
     pdata = all_reports.get(a.get('report_id'))
     if not pdata:
@@ -182,10 +182,18 @@ def dispatch(workflow, a):
         raise ValueError('Output extension must match the selected format')
     if op == 'run' and output.exists() and not a.get('overwrite', False):
         raise ValueError('Output exists; choose another path or explicitly request overwrite')
-    if op == 'run' and format_name in ('html', 'svg') and not bundle:
-        raise ValueError('HTML/SVG can generate companions; use bundle=true and a new bundle directory')
-    if op == 'run' and (format_name == 'tex' or pdata.category == CATEGORY_TREE):
-        raise ValueError('Automatic LaTeX/tree generation requires source-media isolation; use the native dialog for this format')
+    if op == 'run':
+        from importlib.util import spec_from_file_location, module_from_spec
+        protection_spec = spec_from_file_location('gramps_output_protection', Path(__file__).with_name('native_exports.py'))
+        protection = module_from_spec(protection_spec)
+        protection_spec.loader.exec_module(protection)
+        protection.protect_destination(support.db, output)
+    requires_bundle = format_name in ('html', 'svg', 'tex', 'graph')
+    if op == 'run' and requires_bundle and not bundle:
+        raise ValueError('HTML/SVG/LaTeX/tree sources need companions; use bundle=true and a new bundle directory')
+    generation_supported = not (pdata.category == CATEGORY_TREE and format_name == 'pdf')
+    if op == 'run' and not generation_supported:
+        raise ValueError('Tree PDF requires a confined external compiler; export graph/tex or use its native dialog')
     # Bind all option values to the preview, including implied/default values.
     values = {name: native_options.menu.get_option_by_name(name).get_value() for name in option_names}
     for name in option_names:
@@ -224,12 +232,16 @@ def dispatch(workflow, a):
     if op == 'options':
         return {**description, **document_description, 'format': format_name,
                 'document_settings': {name: value for name, value in clr.options_dict.items() if name != 'of'},
-                'bundle_required': format_name in ('html', 'svg'),
-                'generation_supported': format_name != 'tex' and pdata.category != CATEGORY_TREE}
+                'bundle_required': requires_bundle,
+                'generation_supported': generation_supported}
     settings = {name: value for name, value in clr.options_dict.items() if name != 'of'}
     settings['effective_paper'] = {'name': clr.paper.get_name(), 'width': clr.paper.get_width(),
                                    'height': clr.paper.get_height()}
     settings['effective_style'] = clr.option_class.handler.get_default_stylesheet_name()
+    if pdata.category == CATEGORY_TREE and values.get('nodecolor') == 'preferences':
+        from gramps.gen.config import config
+        settings['tree_colours'] = {name: config.get(name) for name in
+                                   ('colors.scheme', 'colors.male-dead', 'colors.female-dead', 'colors.unknown-dead')}
     input_paths = [clr.option_class.handler.filename, clr.option_class.handler.get_stylesheet_savefile(),
                    clr.css_filename, PAPERSIZE, CUSTOM_FILTERS]
     if clr.css_filename:
@@ -237,16 +249,21 @@ def dispatch(workflow, a):
     if clr.doc_options:
         input_paths.append(clr.doc_options.handler.filename)
     inputs = file_states(input_paths)
+    from importlib.util import spec_from_file_location, module_from_spec
+    media_spec = spec_from_file_location('gramps_report_media', Path(__file__).with_name('report_media.py'))
+    media_module = module_from_spec(media_spec)
+    media_spec.loader.exec_module(media_module)
+    media_inputs = media_module.inputs(support.db)
     state = [{'kind': kind, 'handle': handle, 'revision': support.snapshot(kind, support.get(kind, handle=handle))['revision']}
              for kind in ('person', 'family', 'event', 'place', 'source', 'citation', 'repository', 'media', 'note', 'tag')
              for handle in getattr(support.db, 'get_%s_handles' % kind)()]
     existing = hashlib.sha256(output.read_bytes()).hexdigest() if output.is_file() else None
     plan = workflow.revision({'report': pdata.id, 'format': format_name, 'output': str(output),
                               'options': values, 'document_settings': settings, 'input_files': inputs, 'bundle': bundle,
-                              'records': state, 'existing_output': existing})
+                              'records': state, 'existing_output': existing, 'source_images': media_inputs})
     result = {**description, 'output_path': str(output), 'format': format_name,
               'applied': False, 'plan_revision': plan, 'record_count': len(state),
-              'document_settings': settings, 'input_files': inputs, 'bundle': bundle, **document_description}
+              'document_settings': settings, 'input_files': inputs, 'bundle': bundle, 'source_images': media_inputs, **document_description}
     if not a.get('apply', False):
         return result
     if a.get('expected_plan') != plan:
@@ -265,6 +282,8 @@ def dispatch(workflow, a):
         else:
             doc = clr.format(clr.selected_style, paper)
         clr.option_class.handler.doc = doc
+        if format_name == 'tex' or pdata.category == CATEGORY_TREE:
+            media_module.configure(doc, Path(stage_folder.name), media_inputs, pdata.category == CATEGORY_TREE)
         if clr.css_filename is not None and hasattr(doc, 'set_css_filename'):
             doc.set_css_filename(clr.css_filename)
         report = getattr(module, pdata.reportclass)(support.db, clr.option_class, User())
@@ -283,6 +302,8 @@ def dispatch(workflow, a):
             raise ValueError('This format produced companions; preview a new output bundle')
         if file_states(input_paths) != inputs:
             raise ValueError('Report settings changed during generation; destination preserved')
+        if media_inputs and media_module.inputs(support.db) != media_inputs:
+            raise ValueError('Source images changed during generation; destination preserved')
         current_output = hashlib.sha256(output.read_bytes()).hexdigest() if output.is_file() else None
         if current_output != existing:
             raise ValueError('Output changed during report generation; original destination preserved')

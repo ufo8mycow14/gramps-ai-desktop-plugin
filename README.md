@@ -5,7 +5,7 @@ its windows, menus, native editors and already-open family tree. I package it as
 a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
 MCP supplies the tool transport and standalone-client integration.
 
-**Release: 2.5.0 · 47 tools · GPL-2.0-or-later**
+**Release: 2.6.0 · 48 tools · GPL-2.0-or-later**
 
 [Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
 · [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
@@ -26,7 +26,8 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. I provide installation targets for Gramps
 | Structured records | Read schemas and named fields; search by text/field filters; create, update and delete native records | Ten record kinds, including tags; preview by default and revision checks for existing records |
 | Bulk editing | Preview/apply record patches and ordered tag/reference attachments; list/export receipts and save plans | 1–200 operations in one transaction; owner/target revisions and reviewed plans; tree-bound rollback |
 | Custom filters | Discover native rules; build/run definitions; preview/save/delete named filters | Nine namespaces; profile-wide XML store with revision checks and backups; tags use record search |
-| Report automation | Native text, drawing and Graphviz output; paper/orientation/margins/style/CSS and generator options; HTML/SVG bundles | Reviewed destinations; automatic LaTeX/tree generation restricted pending source-media isolation; native dialogs available |
+| Report automation | Native text, drawing, Graphviz, LaTeX and tree-source output; layout/style/CSS and generator options; companion bundles | Source image hashes and isolated derived assets; automatic tree PDF compilation restricted |
+| Exports and backups | Reviewed native XML, compressed Gramps XML, GEDCOM and portable XML/media packages | Whole open tree including private/living records; no filtering; staged output and missing-media review |
 | Media management | Inspect missing paths and file metadata; search explicit directories; preview/relink records | Existing local files; transactional receipts; no moves or downloads |
 | Gramps Web | Authenticated record/search/backlink/history/schema/task access and scoped push/pull | Explicit server, shared handles/IDs, matching Gramps releases and reviewed tree-bound plans |
 | Relationships | Read parents, partners and children; add/remove parent and child memberships | Reciprocal person/family updates in a transaction; ancestry-cycle checks |
@@ -311,21 +312,51 @@ HTML `css_path`. `document_options` accepts the selected generator's observed
 choices, such as SVG `svg_background`. Native types, choices and usable page
 area are validated.
 
-HTML/SVG require `bundle: true` and an output inside a **new directory** under an
+HTML/SVG/LaTeX/tree-source formats require `bundle: true` and an output inside a **new directory** under an
 existing parent, for example `/exports/new-summary/summary.html`. Companions are
 published before the main file; `artifacts` lists every file's relative path,
 size and SHA-256. Existing bundle directories are preserved; bundle overwrite
 is unsupported.
 
 I bind record revisions, effective option/document settings, style/configuration
-file revisions and the existing destination to
+file revisions, source image bytes and the existing destination to
 the preview. Generation uses a temporary file; failed generation preserves the
 destination. Successful receipts include size and SHA-256. Available text/drawing
 formats depend on installed document generators; I verified TXT, PDF, RTF, ODT,
-HTML and drawing SVG. Graphviz needs its native dependencies. Automatic LaTeX
-and tree generation is restricted because native converters can write beside
-source media; use `open` and the native dialog. The listing/options distinguish
-automatic generation support from available formats.
+HTML, drawing SVG and LaTeX. LaTeX images are converted/cropped into private
+JPEG assets; alpha is composited over white. Tree `.tex`/`.graph` thumbnails are
+generated inside the bundle without changing source records or using the shared
+thumbnail cache. All image references are relative to the bundle. I exercised
+the native tree generators through synthetic report registrations; individual
+tree add-ons remain unverified. These source exports do not execute a compiler.
+Graphviz needs its native dependencies. Automatic tree PDF compilation remains
+restricted pending a confined external compiler; use `open` and its native
+dialog. The options response exposes format-specific generation support.
+
+### Reviewed exports and backups
+
+`gramps_export` with `operation: "list"` shows supported installed formats.
+Preview `run` with `format` and an absolute `output_path`, then apply with the
+returned `plan_revision` as `expected_plan`. Formats are `gramps` (`.gramps`,
+compressed native XML), `xml` (`.xml`), `gedcom` (`.ged`) and `gpkg` (`.gpkg`).
+Existing files require `overwrite: true`; failed generation preserves them.
+Destinations cannot replace referenced media or reside in the active native
+database directory. I return record counts, scope, file size and SHA-256.
+
+These are **whole-tree exports, including private and living records**, without
+filtering. GEDCOM follows the native writer and can lose Gramps-specific data;
+use native XML/package backups for restoration. Exports do not replace the open
+database or update any external master GEDCOM. Backups do not include the profile,
+installed add-ons or undo history.
+
+Preview `operation: "backup"` for a native XML backup. `include_media: true`
+selects a `.gpkg` package containing native XML and local media with safe relative
+archive paths. Its reviewed `media` list binds original paths, sizes and hashes;
+the stored XML references included archive members. Missing files and remote
+media are rejected by default. Explicit `allow_missing_media: true` permits an
+incomplete package and reports `missing_media`/`media_complete: false`; original
+missing paths/remote URLs are retained. Remote files are never downloaded.
+I verified package output and a native XML restoration on synthetic data.
 
 ### Media management
 
@@ -368,7 +399,7 @@ After an uncertain write outcome, inspect task/history before retrying. I verifi
 this adapter against a local mock API; a live authenticated Web server remains
 untested. API 3.23.1 targets Gramps 6.0, so it cannot sync with a 6.1 desktop.
 
-## All 47 tools
+## All 48 tools
 
 | Group | Tools |
 | --- | --- |
@@ -379,7 +410,7 @@ untested. API 3.23.1 targets Gramps 6.0, so it cannot sync with a 6.1 desktop.
 | Merges | `gramps_compare`, `gramps_merge` |
 | Context | `gramps_media_info`, `gramps_research`, `gramps_date` |
 | Workflows | `gramps_history`, `gramps_workflow`, `gramps_plugins`, `gramps_settings` |
-| Dedicated workflows | `gramps_filter`, `gramps_report`, `gramps_media_manage` |
+| Dedicated workflows | `gramps_filter`, `gramps_report`, `gramps_export`, `gramps_media_manage` |
 | Gramps Web | `gramps_web`, `gramps_web_sync` |
 
 ## Access, privacy and backups
@@ -406,7 +437,7 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.5.0**, with **47 tools**.
+The plugin package and adapter/bridge API are **2.6.0**, with **48 tools**.
 
 | Check | Verified result |
 | --- | --- |
@@ -418,7 +449,7 @@ The plugin package and adapter/bridge API are **2.5.0**, with **47 tools**.
 | Installed menu and plugin routing | 155 actionable menu entries, 55 GUI tools and 62 GUI reports resolved in the tested configuration |
 | Bulk/archive expansion | 55 isolated native checks on synthetic data, including atomic failures, reference identity/indexes, wrong-tree rollback, saved-plan reuse and archive integrity |
 | Earlier plugin discovery | Version 2.2.1 exposed all 39 baseline tools; version 2.3.1 adds `gramps_batch` |
-| Dedicated integrations | 79 isolated native checks covering nine filter namespaces, TXT/PDF/RTF/ODT/HTML/SVG, document settings/CSS, bundle manifests/failure cleanup, media relinking and guarded Web pull |
+| Dedicated integrations | 115 isolated native checks covering filters, native exports/backups/restoration, isolated LaTeX/tree-source images, portrait sizing, source-image staleness, report formats/settings/bundles, media relinking and guarded Web pull |
 | Web and portable paths | 38 offline mock API/path checks covering authentication, previews, conflicts, dependency guards, task states and platform/version paths |
 | Portable public package | Five grouped offline checks passed; fresh public installation used matching packaged sources; downloaded release ZIP matched the checked archive |
 

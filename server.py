@@ -12,7 +12,7 @@ from platform_paths import runtime_dir
 
 RUNTIME = runtime_dir() / 'connection.json'
 DEFAULT_EXE = os.environ.get('GRAMPS_EXECUTABLE', '')
-VERSION = '2.5.0'
+VERSION = '2.6.0'
 
 
 def schema(properties=None, required=None):
@@ -183,6 +183,13 @@ tool('report', 'Discover reports and native options/formats; preview/generate te
      {'operation': {'type': 'string', 'enum': ['list', 'options', 'run', 'open']},
       'report_id': string(), 'options': {'type': 'object'}, 'document': {'type': 'object'},
       'document_options': {'type': 'object'}, 'bundle': {'type': 'boolean'}, 'format': string(), 'output_path': string(),
+      'overwrite': {'type': 'boolean'}, 'apply': {'type': 'boolean'}, 'expected_plan': string()}, ['operation'])
+tool('export', 'List/preview/write whole-tree native XML, compressed Gramps XML, GEDCOM or portable media packages; '
+     'backup selects native XML with optional media. Includes private/living records; no filtering. '
+     'Apply requires the reviewed plan and explicit destination; missing package media is rejected by default.',
+     {'operation': {'type': 'string', 'enum': ['list', 'run', 'backup']},
+      'format': {'type': 'string', 'enum': ['gramps', 'xml', 'gedcom', 'gpkg']}, 'output_path': string(),
+      'include_media': {'type': 'boolean'}, 'allow_missing_media': {'type': 'boolean'},
       'overwrite': {'type': 'boolean'}, 'apply': {'type': 'boolean'}, 'expected_plan': string()}, ['operation'])
 tool('web', 'Read the explicitly configured authenticated Gramps Web API: status, records, search, history, schema or task. '
      'Configure URL and credentials in local environment variables; never pass or expose tokens in chat.',

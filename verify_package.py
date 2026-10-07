@@ -16,7 +16,7 @@ def main():
     for name in ('server.py', 'desktop_bridge.py', 'support.py', 'configure.py',
                  'DesktopControl.py', 'DesktopControl.gpr.py', 'package_release.py', 'verify_support.py',
                  'ui_support.py', 'verify_menu_support.py', 'batch_support.py', 'batch_files.py', 'workflow_support.py',
-                 'native_filters.py', 'native_reports.py', 'report_output.py', 'web_support.py', 'platform_paths.py',
+                 'native_filters.py', 'native_reports.py', 'report_output.py', 'report_media.py', 'native_exports.py', 'web_support.py', 'platform_paths.py',
                  'install.py', 'verify_batch.py', 'verify_integrations.py'):
         compile((root / name).read_text(encoding='utf-8'), name, 'exec')
     checks.append('source_compiles')
@@ -63,13 +63,13 @@ def main():
     assert replies[2]['error']['code'] == -32600
     assert replies[3]['id'] == 3 and replies[3]['result'] == {}
     tools = replies[4]['result']['tools']
-    assert len(tools) == 47 and len({t['name'] for t in tools}) == 47
+    assert len(tools) == 48 and len({t['name'] for t in tools}) == 48
     assert any('1–200' in tool['description'] for tool in tools)
     checks.append('utf8_stdio_under_windows_legacy_encoding')
     readme = (root / 'README.md').read_text(encoding='utf-8')
     assert all('`' + tool['name'] + '`' in readme for tool in tools)
     assert 'GNU GENERAL PUBLIC LICENSE' in (root / 'LICENSE').read_text()
-    checks.append('malformed_request_error_then_ping_and_47_documented_tools')
+    checks.append('malformed_request_error_then_ping_and_48_documented_tools')
     print(json.dumps({'passed': len(checks), 'checks': checks, 'family_data_access': False}))
 
 

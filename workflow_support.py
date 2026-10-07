@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 from gramps.gen.db import DbTxn
 from gramps.gen.lib.json_utils import object_to_dict
 
-METHODS = {'filter', 'report', 'batch', 'media_manage', 'sync_apply', 'sync_refs'}
+METHODS = {'filter', 'report', 'export', 'batch', 'media_manage', 'sync_apply', 'sync_refs'}
 
 
 class WorkflowSupport:
@@ -20,7 +20,7 @@ class WorkflowSupport:
         self.receipts = {}
 
     def dispatch(self, method, a):
-        if method in ('filter', 'report'):
+        if method in ('filter', 'report', 'export'):
             from importlib.util import spec_from_file_location, module_from_spec
             spec = spec_from_file_location('gramps_native_' + method,
                                            Path(__file__).with_name('native_' + method + 's.py'))
