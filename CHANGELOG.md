@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.4.0 — 7 October 2026
+
+- Add dedicated native filters, report automation, media management, authenticated
+  Gramps Web access and scoped push/pull synchronisation, bringing the plugin to
+  45 tools. Retain the released atomic bulk-edit/receipt/rollback workflow.
+- Preserve native filter definitions and backups with store revisions; reject
+  unavailable rules, dependency cycles and deletion of depended-on filters.
+- Validate report options and bind output plans to records/destinations; stage
+  generation so failures preserve existing files.
+- Inspect scoped missing media paths and metadata; relink explicitly selected
+  files through reviewed transactions without moving or downloading them.
+- Guard sync with shared handles/IDs, tree identity, matching Gramps releases,
+  native references, reciprocal links and ancestry checks. Include previewed
+  dependency guard updates; report queued writes as pending.
+- Add a dependency-free Python installer and PowerShell wrapper for Gramps 6.0/6.1
+  with Windows/Linux/macOS paths and explicit overrides.
+- Exercise native workflows on isolated synthetic data and Web operations against
+  a mock API. Live Web, Linux/macOS GTK and Gramps 6.0 desktop remain unverified.
+
 ## 2.3.1 — 7 October 2026
 
 - Set the MCP stdio protocol to UTF-8 explicitly on Windows, preserving Unicode

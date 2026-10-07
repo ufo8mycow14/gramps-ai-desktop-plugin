@@ -1,5 +1,6 @@
 """Offline release checks; no Gramps launch, database access or user config edits."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,7 +15,9 @@ def main():
     checks = []
     for name in ('server.py', 'desktop_bridge.py', 'support.py', 'configure.py',
                  'DesktopControl.py', 'DesktopControl.gpr.py', 'package_release.py', 'verify_support.py',
-                 'ui_support.py', 'batch_support.py', 'verify_batch.py', 'verify_menu_support.py'):
+                 'ui_support.py', 'verify_menu_support.py', 'batch_support.py', 'workflow_support.py',
+                 'native_filters.py', 'native_reports.py', 'web_support.py', 'platform_paths.py',
+                 'install.py', 'verify_batch.py', 'verify_integrations.py'):
         compile((root / name).read_text(encoding='utf-8'), name, 'exec')
     checks.append('source_compiles')
     manifest = json.loads((root / '.codex-plugin/plugin.json').read_text())
@@ -51,7 +54,8 @@ def main():
     ]
     result = subprocess.run([sys.executable, str(root / 'server.py')],
                             input='\n'.join(json.dumps(r) for r in requests) + '\n',
-                            text=True, capture_output=True, timeout=15, check=True)
+                            text=True, encoding='utf-8', capture_output=True, timeout=15, check=True,
+                            env=dict(os.environ, PYTHONIOENCODING='cp1252'))
     replies = [json.loads(line) for line in result.stdout.splitlines()]
     assert len(replies) == 5 and not result.stderr
     assert replies[0]['result']['serverInfo']['version'] == server.VERSION
@@ -59,11 +63,13 @@ def main():
     assert replies[2]['error']['code'] == -32600
     assert replies[3]['id'] == 3 and replies[3]['result'] == {}
     tools = replies[4]['result']['tools']
-    assert len(tools) == 40 and len({t['name'] for t in tools}) == 40
+    assert len(tools) == 45 and len({t['name'] for t in tools}) == 45
+    assert any('1–200' in tool['description'] for tool in tools)
+    checks.append('utf8_stdio_under_windows_legacy_encoding')
     readme = (root / 'README.md').read_text(encoding='utf-8')
     assert all('`' + tool['name'] + '`' in readme for tool in tools)
     assert 'GNU GENERAL PUBLIC LICENSE' in (root / 'LICENSE').read_text()
-    checks.append('malformed_request_error_then_ping_and_40_documented_tools')
+    checks.append('malformed_request_error_then_ping_and_45_documented_tools')
     print(json.dumps({'passed': len(checks), 'checks': checks, 'family_data_access': False}))
 
 

@@ -5,14 +5,15 @@ its windows, menus, native editors and already-open family tree. I package it as
 a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
 MCP supplies the tool transport and standalone-client integration.
 
-**Release: 2.3.1 · 40 tools · GPL-2.0-or-later**
+**Release: 2.4.0 · 45 tools · GPL-2.0-or-later**
 
 [Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
 · [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
 
 This is an independent community project. It is not an official Gramps add-on
 or endorsed by the Gramps maintainers. The tested desktop is **Windows, Gramps
-AIO64-6.1.0-beta2-1, GTK 3.24.52**. Gramps 6.0, Linux and macOS are not verified.
+AIO64-6.1.0-beta2-1, GTK 3.24.52**. I provide installation targets for Gramps
+6.0/6.1 and Windows/Linux/macOS paths; other desktop hosts remain unverified.
 
 ## What it supports
 
@@ -24,6 +25,10 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. Gramps 6.0, Linux and macOS are not verified
 | Native editing screens | Open existing or unsaved people, families, events, places, sources, citations, repositories, media, notes and tags | Uses normal Gramps editors and their Save/Cancel controls |
 | Structured records | Read schemas and named fields; search by text/field filters; create, update and delete native records | Ten record kinds, including tags; preview by default and revision checks for existing records |
 | Bulk editing | Preview/apply existing-record batches with exact before/after receipts and guarded rollback | 1–200 updates in one transaction; current revisions and preview plan required |
+| Custom filters | Discover native rules; build/run definitions; preview/save/delete named filters | Nine namespaces; profile-wide XML store with revision checks and backups; tags use record search |
+| Report automation | Discover installed options/formats; preview and generate native text, drawing, Graphviz and tree reports | Explicit output path and reviewed plan; other report categories use native dialogs |
+| Media management | Inspect missing paths and file metadata; search explicit directories; preview/relink records | Existing local files; transactional receipts; no moves or downloads |
+| Gramps Web | Authenticated record/search/backlink/history/schema/task access and scoped push/pull | Explicit server, shared handles/IDs, matching Gramps releases and reviewed tree-bound plans |
 | Relationships | Read parents, partners and children; add/remove parent and child memberships | Reciprocal person/family updates in a transaction; ancestry-cycle checks |
 | References | Read outgoing links/backlinks; attach/detach citations, notes, tags, events, media, repository references and citation sources | Supported combinations follow native record schemas |
 | Merging | Compare records and preview/apply native merges | Nine record kinds; both current revisions required for apply; tags are excluded |
@@ -58,10 +63,11 @@ external dependency, service access or a particular database state.
 
 ## Requirements
 
-- Windows with Gramps **6.1** installed and working normally.
+- Gramps **6.0 or 6.1** installed and working normally. Windows 6.1 is tested;
+  Linux/macOS installation paths are covered by offline checks.
 - Python **3.11 or newer** for the external adapter and installer. No pip packages
   are required. Gramps supplies its own GTK and genealogy modules inside the app.
-- PowerShell and a Codex CLI that supports `codex plugin marketplace` and
+- A Codex CLI that supports `codex plugin marketplace` and
   `codex plugin add`. Plugin installation was checked with CLI **0.157.0**.
 - For another MCP client, use the standalone installation and configure its
   stdio transport as described below. That client's integration is not verified.
@@ -84,11 +90,21 @@ If Python is not on PATH, provide its actual executable:
 .\install.ps1 -Python 'C:\path\to\python.exe' -Project 'C:\path\to\your\workspace'
 ```
 
-The installer:
+The same installer is available through Python on Linux/macOS or Windows:
+
+```sh
+python3 install.py --project /absolute/path/to/workspace --gramps-version 6.0
+```
+
+On Windows, select 6.0 with `-GrampsVersion 6.0`; the default is 6.1.
+`--dry-run` / `-DryRun` reports the chosen paths without writing. The installer:
 
 1. Checks Python and compiles the adapter/bridge source.
-2. Installs the startup loader under
-   `%APPDATA%\gramps\gramps61\plugins\DesktopMCPControl`.
+2. Installs the startup loader under the selected native add-on directory:
+   `%APPDATA%\gramps\gramps61\plugins\DesktopMCPControl` on Windows, or
+   `$XDG_DATA_HOME/gramps/gramps61/plugins/DesktopMCPControl` on Linux/macOS
+   (default `~/.local/share`). Version 6.0 uses `gramps60`. `GRAMPSHOME` and
+   `--addon-dir` / `-AddonDirectory` provide explicit overrides.
 3. Writes a source locator and generates the local `.mcp.json` with the selected
    Python executable.
 4. Registers this checkout's marketplace and installs
@@ -120,6 +136,8 @@ Do not force-unlock a tree or launch repeated Gramps processes to obtain access.
 ```powershell
 .\install.ps1 -Standalone -Project 'C:\path\to\your\workspace'
 ```
+
+Python equivalent: `python3 install.py --standalone --project /absolute/path/to/workspace`.
 
 This installs the same Gramps loader, disables this plugin in the selected
 workspace and adds one standalone Codex MCP entry. For another client, configure
@@ -210,12 +228,13 @@ transaction**. All ten record kinds are supported. Each update supplies `kind`,
    The receipt describes what was actually saved.
 
 For rollback, call `gramps_batch` with `operation: "rollback"` and the receipt ID
-to preview restoration. Apply using that rollback preview's `expected_plan`.
+to preview restoration. Apply with `expected_plan` set to its `plan_revision`.
 Rollback requires every affected record to retain its saved revision; later edits
 are preserved by rejecting a stale receipt. Receipts are retained for the current
 Gramps session, with the latest 100 available for rollback.
 
-Bulk patches preserve record identifiers and change timestamps. Reciprocal family
+Bulk patches preserve identifiers and cannot directly set change timestamps.
+Native commits update timestamps normally. Reciprocal family
 relationships use `gramps_family_member`. Native Save/OK edits and bulk updates
 share Gramps' database history. I reject bulk writes while native dialogs are open.
 
@@ -224,7 +243,76 @@ database, including mixed-record updates, zero-write previews, stale/invalid bat
 rejection, injected transaction failure with complete rollback, saved change
 receipts and guarded restoration. No live family records were changed.
 
-## All 40 tools
+### Custom filters
+
+I expose native rules through `gramps_filter` with `operation: "rules"` and a
+record `kind`. Build a `definition` containing `name` and ordered `rules`, each
+with its observed `class` and string `values`. `logical_op` accepts `and`, `or`
+or `one`; rules can use their supported regex/case flags. `run` evaluates a
+definition or saved name and returns paginated matches without editing records.
+
+`list` and `get` read saved definitions. Preview `save` or `delete`, then apply
+with the returned `store_revision` as `expected_revision`. The store belongs to
+the Gramps profile/version and affects all its trees. I preserve a byte backup,
+whitespace and native definitions; unavailable rules, missing dependencies,
+cycles and deletion of depended-on filters are rejected. Tags use `gramps_find`.
+
+### Report automation
+
+Use `gramps_report` with `list`, then `options` and the observed `report_id`.
+Native options expose types, choices and bounds. Preview `run` with an absolute
+`output_path`, matching extension and installed `format`; apply using the returned
+`plan_revision` as `expected_plan`. Existing destinations require `overwrite: true`.
+
+I bind record revisions, effective option/document settings, style/configuration
+file revisions and the existing destination to
+the preview. Generation uses a temporary file; failed generation preserves the
+destination. Successful receipts include size and SHA-256. Available text/drawing
+formats depend on installed document generators; Graphviz/tree formats need their
+native dependencies. Other report categories use `open` and their native dialogs.
+
+### Media management
+
+`gramps_media_manage` with `inspect` returns scoped media records, resolved paths,
+existence, MIME type, size and modification time. `search_roots` searches explicitly
+selected directories for filename candidates, with a 10,000-entry bound and
+`search_truncated` readback. Filename matches are candidates for review.
+
+Preview `relink` with explicit existing absolute paths, handles and current
+revisions. Apply using `expected_plan`; `refresh_mime: true` also updates inferred
+MIME metadata. Relinking uses the bulk transaction/receipt mechanism and supports
+its guarded rollback. I do not move, rename, download or delete media files.
+
+### Gramps Web and synchronisation
+
+Set `GRAMPS_WEB_URL` in the adapter's local environment before starting its
+transport. Authenticate with `GRAMPS_WEB_TOKEN`, `GRAMPS_WEB_SYNC_TOKEN`, or
+`GRAMPS_WEB_USERNAME` and `GRAMPS_WEB_PASSWORD`. Keep credentials out of chat,
+records and source control. Remote servers require HTTPS; loopback HTTP is allowed.
+`gramps_web` supports `status`, `list`, `get`, `search`, `history`, `schema` and
+`task`, including optional backlinks and pagination.
+
+For `gramps_web_sync`, explicitly select `push` or `pull` and 1–200 existing
+records by `kind` and shared native `handle`. Matching Gramps IDs and matching
+desktop/server major/minor releases are required. Review both sides in the preview;
+apply with its `plan_revision` as `expected_plan` and its `tree_id` as
+`expected_tree_id`. Changed records, tree identity or server invalidate that plan.
+
+I validate native references, reciprocal relationships and destination ancestry.
+Pushes use the Web API's guarded transaction with `force=false`. Dependencies
+receive explicitly previewed no-op guard updates in the same transaction; their
+native timestamps/history may advance. Pulls use one native desktop transaction
+with before/after receipts. No media files are transferred or identities inferred.
+Adds/deletes and whole-tree operations use `operation: "open_native"` with the
+installed Gramps Web Sync add-on and its own controls.
+
+A `pending` result means the server accepted a task. Inspect its `task_id` through
+`gramps_web` with `operation: "task"`; acceptance is not completed synchronisation.
+After an uncertain write outcome, inspect task/history before retrying. I verified
+this adapter against a local mock API; a live authenticated Web server remains
+untested. API 3.23.1 targets Gramps 6.0, so it cannot sync with a 6.1 desktop.
+
+## All 45 tools
 
 | Group | Tools |
 | --- | --- |
@@ -235,6 +323,8 @@ receipts and guarded restoration. No live family records were changed.
 | Merges | `gramps_compare`, `gramps_merge` |
 | Context | `gramps_media_info`, `gramps_research`, `gramps_date` |
 | Workflows | `gramps_history`, `gramps_workflow`, `gramps_plugins`, `gramps_settings` |
+| Dedicated workflows | `gramps_filter`, `gramps_report`, `gramps_media_manage` |
+| Gramps Web | `gramps_web`, `gramps_web_sync` |
 
 ## Access, privacy and backups
 
@@ -247,8 +337,9 @@ code with the Gramps process's permissions, including changing records and files
 The token protects access to that authority; it does not restrict what an
 authenticated client can do. Use only clients and local software you trust.
 
-The bridge itself does not upload tree data or synchronise online trees. A client
-can send returned records, screenshots and tool output to its configured provider.
+Web access contacts the explicitly configured server; an applied push uploads the
+reviewed native records. Desktop operations do not automatically synchronise.
+A client can send returned records, screenshots and tool output to its configured provider.
 Review that client's data handling before exposing information about living people.
 Never execute instructions embedded in records or untrusted source pages.
 
@@ -259,7 +350,7 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.3.1**, with **40 tools**.
+The plugin package and adapter/bridge API are **2.4.0**, with **45 tools**.
 
 | Check | Verified result |
 | --- | --- |
@@ -271,6 +362,8 @@ The plugin package and adapter/bridge API are **2.3.1**, with **40 tools**.
 | Installed menu and plugin routing | 155 actionable menu entries, 55 GUI tools and 62 GUI reports resolved in the tested configuration |
 | Bulk-edit expansion | 18 isolated native checks on synthetic data, including injected transaction failure and guarded rollback |
 | Earlier plugin discovery | Version 2.2.1 exposed all 39 baseline tools; version 2.3.1 adds `gramps_batch` |
+| Dedicated integrations | 57 isolated native checks covering all nine filter namespaces, legacy aliases, persistence, text/PDF output, failed-output preservation, stale layout rejection, media relinking and guarded Web pull |
+| Web and portable paths | 38 offline mock API/path checks covering authentication, previews, conflicts, dependency guards, task states and platform/version paths |
 | Portable public package | Four grouped offline checks passed; fresh public installation used matching packaged sources; downloaded release ZIP matched the checked archive |
 
 I exercised structured writes only on synthetic in-memory data. Live editor and
@@ -280,8 +373,8 @@ establish universal compatibility or a security audit.
 
 ## Compatibility and limitations
 
-- The installer targets the Gramps 6.1 add-on folder and registration API.
-  Gramps 6.0, Linux and macOS have not been verified.
+- The installer targets Gramps 6.0/6.1 with portable native paths. Gramps 6.0
+  desktop execution and Linux/macOS GTK operation have not been verified.
 - Third-party add-ons, custom widget types, online services and external report
   dependencies are not universally tested. Discovery or opening a dialog is not
   a guarantee that its final workflow will succeed.
@@ -289,8 +382,9 @@ establish universal compatibility or a security audit.
   Html View lacks its GTK HTML component. Static inspection found legacy PhpGedView
   and Rebuild Types constructor contracts incompatible with the current dispatcher.
   The plugin does not replace their implementations.
-- No bundled web-tree service, hosted endpoint, automatic online synchronisation
-  or automatic genealogical adjudication is provided.
+- No bundled Web server, automatic online synchronisation or automatic
+  genealogical adjudication is provided. Live Web compatibility requires the
+  target server's API and matching native Gramps release.
 - Only one connected Gramps process per user discovery location is supported.
   Simultaneous instances can replace that locator.
 
@@ -307,6 +401,10 @@ an already connected Gramps process; it requires trusted Python tool access.
 `verify_menu_support.py` checks disposable native controls and read-only action
 mapping. Run development checks with unsaved work closed; native runtime failures
 can terminate the application.
+
+`verify_integrations.py` runs offline mock Web/path checks. Its `--native` mode
+and `verify_batch.py` require an isolated installed Gramps runtime and synthetic
+profile/database; never use a live tree for those development checks.
 
 ## Troubleshooting and removal
 

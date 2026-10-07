@@ -72,7 +72,8 @@ if __name__ == '__main__':
     if updated != text and not args.prepare_only:
         config.parent.mkdir(parents=True, exist_ok=True)
         config.write_text(updated, encoding='utf-8')
-    locator = {'source': str((args.tools / 'desktop_bridge.py').resolve()), 'version': '2.3.1'}
+    version = json.loads((args.tools / '.codex-plugin/plugin.json').read_text(encoding='utf-8'))['version']
+    locator = {'source': str((args.tools / 'desktop_bridge.py').resolve()), 'version': version}
     (args.addon / 'bridge_source.json').write_text(json.dumps(locator, indent=2) + '\n', encoding='utf-8')
     transport = {'mcpServers': {'gramps_desktop': {'command': str(args.python.resolve()).replace('\\', '/'),
                  'args': ['server.py'], 'cwd': '.',

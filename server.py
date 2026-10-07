@@ -8,10 +8,11 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from platform_paths import runtime_dir
 
-RUNTIME = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'GrampsDesktopMCP' / 'connection.json'
+RUNTIME = runtime_dir() / 'connection.json'
 DEFAULT_EXE = os.environ.get('GRAMPS_EXECUTABLE', '')
-VERSION = '2.3.1'
+VERSION = '2.4.0'
 
 
 def schema(properties=None, required=None):
@@ -139,7 +140,12 @@ tool('rows', 'Read paginated rows/choices from a discovered native GTK TreeView 
      {'widget_id': string(), 'parent_path': string(), 'limit': integer(), 'offset': integer()}, ['widget_id'], True)
 tool('date', 'Parse and display a genealogical date using the installed Gramps date handler.', {'text': string()}, ['text'], True)
 
-
+tool('filter', 'Discover native filter rules, build/run custom filters and preview/save/delete profile-wide filters. '
+     'Saving/deleting requires the current store revision. Tags use find; native filters cover nine kinds.',
+     {'operation': {'type': 'string', 'enum': ['rules', 'list', 'get', 'run', 'save', 'delete']},
+      'kind': KINDS, 'name': string(), 'definition': {'type': 'object'},
+      'handles': {'type': 'array', 'items': string()}, 'store_path': string(),
+      'expected_revision': string(), 'apply': {'type': 'boolean'}, 'offset': integer(), 'limit': integer()}, ['operation'])
 change_schema = schema({'kind': KINDS, 'handle': string(), 'expected_revision': string(),
                         'patch': {'type': 'object'}}, ['kind', 'handle', 'expected_revision', 'patch'])
 tool('batch', 'Preview/apply 1–200 distinct record updates in one native transaction, or preview/perform receipt rollback. '
@@ -147,6 +153,33 @@ tool('batch', 'Preview/apply 1–200 distinct record updates in one native trans
      {'operation': {'type': 'string', 'enum': ['update', 'rollback']},
       'changes': {'type': 'array', 'items': change_schema}, 'receipt_id': string(),
       'expected_plan': string(), 'apply': {'type': 'boolean'}, 'label': string()})
+tool('media_manage', 'Inspect scoped media metadata/missing paths, find candidates under explicit directories, '
+     'or preview/relink existing files transactionally. Never moves or downloads files.',
+     {'operation': {'type': 'string', 'enum': ['inspect', 'relink']},
+      'handles': {'type': 'array', 'items': string()}, 'search_roots': {'type': 'array', 'items': string()},
+      'changes': {'type': 'array', 'items': schema({'handle': string(), 'expected_revision': string(), 'path': string()},
+                                                  ['handle', 'expected_revision', 'path'])},
+      'refresh_mime': {'type': 'boolean'}, 'apply': {'type': 'boolean'}, 'expected_plan': string(),
+      'label': string(), 'offset': integer(), 'limit': integer()})
+tool('report', 'Discover reports and native options/formats; preview/generate text, drawing, Graphviz or tree reports '
+     'at an explicit output path. Validate IDs/choices and confirm current plan before writing; other categories use open.',
+     {'operation': {'type': 'string', 'enum': ['list', 'options', 'run', 'open']},
+      'report_id': string(), 'options': {'type': 'object'}, 'format': string(), 'output_path': string(),
+      'overwrite': {'type': 'boolean'}, 'apply': {'type': 'boolean'}, 'expected_plan': string()}, ['operation'])
+tool('web', 'Read the explicitly configured authenticated Gramps Web API: status, records, search, history, schema or task. '
+     'Configure URL and credentials in local environment variables; never pass or expose tokens in chat.',
+     {'operation': {'type': 'string', 'enum': ['status', 'list', 'get', 'search', 'history', 'schema', 'task']},
+      'kind': KINDS, 'handle': string(), 'query': string(), 'page': integer(), 'limit': integer(),
+      'backlinks': {'type': 'boolean'}, 'after_id': string(), 'task_id': string()}, ['operation'], True)
+TOOLS[-1]['annotations']['openWorldHint'] = True
+tool('web_sync', 'Preview/apply scoped existing-record push/pull between matching Gramps releases, '
+     'requiring shared handles/IDs, an explicit tree ID and unchanged preview on both sides. '
+     'No file transfer or inferred identity. open_native opens the installed whole-tree Web Sync add-on.',
+     {'operation': {'type': 'string', 'enum': ['sync', 'open_native']},
+      'direction': {'type': 'string', 'enum': ['push', 'pull']},
+      'records': {'type': 'array', 'items': schema({'kind': KINDS, 'handle': string()}, ['kind', 'handle'])},
+      'expected_tree_id': string(), 'expected_plan': string(), 'apply': {'type': 'boolean'}})
+TOOLS[-1]['annotations']['openWorldHint'] = True
 
 
 def validate(value, field, path='arguments'):
@@ -255,13 +288,17 @@ def call_tool(name, arguments):
     method = name.removeprefix('gramps_')
     if method == 'health':
         return health()
+    if method in ('web', 'web_sync'):
+        import web_support
+        result = web_support.web(arguments) if method == 'web' else web_support.web_sync(arguments, call_bridge)
+        return {'state': 'done', 'result': result}
     if method == 'launch':
         try:
             return call_bridge('status', {})
         except (OSError, ValueError, urllib.error.URLError):
             pass
         exe = Path(arguments.get('executable', DEFAULT_EXE))
-        if not exe.is_absolute() or exe.name.lower() not in ('grampsw.exe', 'gramps.exe', 'grampsd.exe') or not exe.is_file():
+        if not exe.is_absolute() or exe.name.lower() not in ('grampsw.exe', 'gramps.exe', 'grampsd.exe', 'gramps') or not exe.is_file():
             raise ValueError('Supply the absolute installed Gramps executable')
         proc = subprocess.Popen([str(exe)], cwd=exe.parent, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         deadline = time.monotonic() + 30
@@ -292,7 +329,7 @@ def handle(request):
         result = {'protocolVersion': requested if requested in supported else '2025-06-18',
                   'capabilities': {'tools': {'listChanged': False}},
                   'serverInfo': {'name': 'gramps-desktop', 'version': VERSION},
-                  'instructions': 'Controls the running Gramps 6.1 GTK desktop. Inspect before acting. '
+                  'instructions': 'Controls the running Gramps GTK desktop and explicitly configured Gramps Web. Inspect before acting. '
                   'Full access does not override project evidence, privacy or sole-master rules.'}
     elif method == 'ping':
         result = {}

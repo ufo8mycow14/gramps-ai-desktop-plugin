@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from gi.repository import Gtk, Gdk, GLib
 
 MAX_BODY = 1024 * 1024
-VERSION = '2.3.1'
+VERSION = '2.4.0'
 INSTANCE = None
 
 
@@ -30,8 +30,14 @@ class DesktopBridge:
         self.jobs = {}
         self.lock = threading.RLock()
         self.started = time.time()
-        self.runtime = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'GrampsDesktopMCP'
-        self.runtime.mkdir(parents=True, exist_ok=True)
+        from importlib.util import spec_from_file_location, module_from_spec
+        paths_spec = spec_from_file_location('gramps_desktop_paths', Path(__file__).with_name('platform_paths.py'))
+        paths = module_from_spec(paths_spec)
+        paths_spec.loader.exec_module(paths)
+        self.runtime = paths.runtime_dir()
+        self.runtime.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if os.name != 'nt':
+            self.runtime.chmod(0o700)
         self.discovery = self.runtime / 'connection.json'
         bridge = self
 
@@ -68,6 +74,8 @@ class DesktopBridge:
                 'version': VERSION, 'started': self.started}
         temp = self.discovery.with_suffix('.tmp')
         temp.write_text(json.dumps(info), encoding='utf-8')
+        if os.name != 'nt':
+            temp.chmod(0o600)
         os.replace(temp, self.discovery)
         threading.Thread(target=self.server.serve_forever, daemon=True, name='GrampsDesktopMCP').start()
 
@@ -216,7 +224,8 @@ class DesktopBridge:
             return getattr(self.native_ui, method)(a)
         if method in ('capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
                       'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
-                      'history', 'workflow', 'plugins', 'settings', 'rows', 'date', 'batch'):
+                      'history', 'workflow', 'plugins', 'settings', 'rows', 'date',
+                      'filter', 'report', 'batch', 'media_manage', 'sync_apply', 'sync_refs'):
             if not hasattr(self, 'support'):
                 spec = spec_from_file_location('gramps_desktop_support', Path(__file__).with_name('support.py'))
                 module = module_from_spec(spec)

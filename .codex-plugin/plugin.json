@@ -1,7 +1,7 @@
 {
   "name": "gramps-desktop",
-  "version": "2.3.1",
-  "description": "Control Gramps desktop records with reviewable atomic bulk edits and change receipts.",
+  "version": "2.4.0",
+  "description": "Control Gramps desktop records, filters, reports, media workflows and configured Gramps Web.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {

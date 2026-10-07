@@ -14,7 +14,8 @@ KINDS = {'person': 'Person', 'family': 'Family', 'event': 'Event', 'place': 'Pla
          'media': 'Media', 'note': 'Note', 'tag': 'Tag'}
 METHODS = {'capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
            'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
-           'history', 'workflow', 'plugins', 'settings', 'rows', 'date', 'batch'}
+           'history', 'workflow', 'plugins', 'settings', 'rows', 'date',
+           'filter', 'report', 'batch', 'media_manage', 'sync_apply', 'sync_refs'}
 
 
 def revision(data):
@@ -168,13 +169,28 @@ class GrampsSupport:
                 spec.loader.exec_module(module)
                 self.batches = module.BatchSupport(self, decode, merge_patch, revision)
             return self.batches.batch(a)
+        if method in ('filter', 'report', 'media_manage', 'sync_apply', 'sync_refs'):
+            if not hasattr(self, 'workflows'):
+                from importlib.util import spec_from_file_location, module_from_spec
+                spec = spec_from_file_location('gramps_desktop_workflows', Path(__file__).with_name('workflow_support.py'))
+                module = module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.workflows = module.WorkflowSupport(self, decode, merge_patch, revision)
+            return self.workflows.dispatch(method, a)
         if method == 'capabilities':
-            return {'version': '2.3.1', 'kinds': KINDS, 'structured_methods': sorted(METHODS),
+            from gramps.version import VERSION as gramps_version
+            import sys
+            return {'version': '2.4.0', 'gramps_version': gramps_version, 'platform': sys.platform,
+                    'kinds': KINDS, 'structured_methods': sorted(METHODS),
+                    'integrations': ['native_filters', 'native_reports', 'atomic_batch_updates',
+                                     'media_inspection_relink', 'configured_gramps_web', 'scoped_web_sync'],
                     'native_editors': list(KINDS), 'merge_kinds': [k for k in KINDS if k != 'tag'],
                     'writes': 'Native DbTxn with record revisions; preview unless apply=true',
                     'fallback': 'Native GTK controls/actions and privileged gramps_python',
                     'native_menu_methods': ['menus', 'menu', 'cells'],
-                    'limits': ['Installed Gramps 6.1 only', 'Add-on dependencies and external service access still apply',
+                    'limits': ['Native runtime tested on Windows Gramps 6.1; portable installers target 6.0/6.1',
+                               'Web sync requires equal Gramps release lines and an explicit target tree',
+                               'Add-on dependencies and external service access still apply',
                                'No automatic sync to the project master GEDCOM', 'No genealogical decision inferred from a match']}
         if method == 'schema':
             kind = self.kind(a['kind'])

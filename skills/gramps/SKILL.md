@@ -3,7 +3,8 @@ name: gramps
 description: Control the installed Gramps desktop, inspect or edit its open database, and use native genealogy workflows through the Gramps Desktop plugin.
 ---
 
-Use the plugin's `gramps_*` tools for the installed Gramps 6.1 desktop. The
+Use the plugin's `gramps_*` tools for the installed Gramps desktop. Installation
+targets 6.0/6.1; native execution is verified on Windows 6.1. The
 Gramps startup add-on shares the application's open database and GTK main thread.
 Read `gramps_health`, `gramps_status` and `gramps_capabilities` first. Health works
 with Gramps closed and flags bridge version/startup/dialog problems without
@@ -27,6 +28,27 @@ Choose the relevant route:
   before/after snapshots and `receipt_id`. Rollback is previewed separately and
   requires every affected record to retain its saved revision in this session.
   Use `family_member` for reciprocal family relationships.
+- Custom filters: discover `filter` rules for the requested kind; use observed
+  native classes and ordered string arguments. Run definitions without editing
+  records. Preview save/delete and apply with the current store revision.
+  Saved filters affect the profile's trees; preserve unavailable rules and
+  dependent filters. Tags use `find` instead of native filter namespaces.
+- Report automation: discover `report` IDs, options and formats. Preview `run`
+  with an explicit absolute destination, then apply with `expected_plan`.
+  Existing output needs explicit overwrite. Generation stages output and returns
+  size/hash; non-automatable categories use native `open` dialogs.
+- Media management: inspect scoped `media_manage` metadata/missing paths and
+  search explicit directories for candidates. Review identity before relinking
+  existing files with current revisions and `expected_plan`; retain the batch
+  receipt. No moves or downloads are performed.
+- Gramps Web: use `web` only with an explicit configured server and local
+  environment authentication. Never expose tokens/passwords. Remote HTTPS is
+  required. `web_sync` previews 1–200 existing shared handles/IDs with explicit
+  direction; apply requires `expected_plan`, `expected_tree_id` and matching
+  Gramps major/minor releases. Review dependency no-op guard updates too; their
+  timestamps/history may advance. References, reciprocity and ancestry are
+  checked. A pending task is not completion; query its returned task ID before
+  retrying uncertain writes. Whole-tree adds/deletes use installed native sync.
 - Native application: inspect `windows`, `widgets`, `menus`, `cells`, `actions`, `views`, `rows` and `selection`
   before operating observed IDs/actions. `editor` opens unsaved or existing native
   editing screens; Save/OK commits through Gramps. Cancel temporary test dialogs.
@@ -64,7 +86,9 @@ online trees. Full tool access does not authorise edits, merges, file operations
 or online writes outside the user's current task. Respect the workspace's
 evidence standards, preservation requirements and authoritative dataset rules.
 
-Support is verified for the installed Gramps 6.1 build. Third-party add-ons may
+Support is verified for the installed Windows Gramps 6.1 build. Web is checked
+against a mock API; live Web and other GTK platforms require their hosts.
+Third-party add-ons may
 require additional dependencies and online services require their own access.
 For installation, rollback and verification details, read the project-owned
 package's `README.md` when needed.
