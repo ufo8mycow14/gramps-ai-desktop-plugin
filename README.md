@@ -1,8 +1,9 @@
 # Gramps Desktop plugin
 
-I built this plugin to let an MCP client work with the **running Gramps desktop**:
-its windows, menus, native editors and already-open family tree. It combines a
-Gramps startup add-on with a Codex plugin and a dependency-free Python adapter.
+I built this plugin to let Codex work with the **running Gramps desktop**:
+its windows, menus, native editors and already-open family tree. I package it as
+a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
+MCP supplies the tool transport and standalone-client integration.
 
 **Release: 2.2.1 · 39 tools · GPL-2.0-or-later**
 
@@ -33,6 +34,26 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. Gramps 6.0, Linux and macOS are not verified
 
 The ten structured record kinds are `person`, `family`, `event`, `place`,
 `source`, `citation`, `repository`, `media`, `note` and `tag`.
+
+### Menus, tools and reports
+
+I expose the native menu hierarchy and installed report/tool actions, including
+context menus and widget-local popups. The plugin reads each action's path,
+target, scope and enabled state, then invokes Gramps' own action. New menu
+discovery is required after a menu revision changes.
+
+Native dialog control includes text fields, tables, editable combo cells,
+selections, tabs, toggles, numeric values, calendars, colours, fonts and
+file/folder choosers. All ten record kinds have native editor access, alongside
+structured record operations and trusted Python access for advanced work.
+
+Read-only discovery in the tested installation resolved **155 actionable menu
+entries, 55 GUI tools and 62 GUI reports**. These are overlapping inventories of
+available entry points; the visible menu inventory depends on the current view,
+open tree and dialogs.
+They establish native action routing; I have not verified the final execution
+of every report, tool or third-party add-on. A workflow can still require an
+external dependency, service access or a particular database state.
 
 ## Requirements
 
@@ -137,6 +158,7 @@ windows. Useful requests include:
 - “Preview this note update and show the changed fields before applying it.”
 - “Compare these two records and their references before I decide about a merge.”
 - “Open the backup dialog.”
+- “List the installed reports and tools, then open this report's options dialog.”
 
 For structured changes, first read the schema and current object. Preview the
 change with `apply: false` (the default), inspect the proposed result, then apply
@@ -204,27 +226,31 @@ Make a Gramps backup before substantial changes. Native undo/redo is useful but
 does not replace a backup or reverse every file operation. Desktop changes do not
 automatically update an external GEDCOM or an online tree.
 
+## Verified coverage
+
+I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
+The plugin package and adapter/bridge API are **2.2.1**, with **39 tools**.
+
+| Check | Verified result |
+| --- | --- |
+| Structured records and database operations | 57 baseline checks using synthetic SQLite `:memory:` data |
+| Desktop connection and controls | 19 baseline live UI/MCP checks, including nine native editor kinds opened, inspected and cancelled |
+| Installation and rollout | 13 focused checks for configuration migration, diagnostics and disposable GTK controls |
+| Expanded native GTK controls | 33 isolated checks covering cell-editor lifecycles, popup scopes, file selection, numeric/calendar/colour/font controls and rejected inputs |
+| Native dialog access | Eight synthetic open/inspect/cancel checks: tag editor; `dupfind`, `eventcmp`, `mediaman`, `editowner`; `ancestor_report`, `descend_report`, `summary` |
+| Installed menu and plugin routing | 155 actionable menu entries, 55 GUI tools and 62 GUI reports resolved in the tested configuration |
+| Current plugin discovery | One enabled desktop server with version 2.2.1 and all 39 tools |
+| Portable public package | Four grouped offline checks passed; fresh public installation used matching packaged sources; downloaded release ZIP matched the checked archive |
+
+I exercised structured writes only on synthetic in-memory data. Live editor and
+workflow checks cancelled temporary dialogs. Menu discovery and options-dialog
+checks do not certify a workflow's final output, and these checks do not
+establish universal compatibility or a security audit.
+
 ## Compatibility and limitations
 
-- Verified desktop: Windows Gramps AIO64-6.1.0-beta2-1, GTK 3.24.52. The installer
-  targets the Gramps 6.1 add-on folder and registration API.
-- The plugin package and adapter/bridge API are **2.2.1**.
-- Baseline verification covered **57 synthetic SQLite `:memory:` checks** and
-  **19 live UI/MCP checks**. A further **13 focused rollout checks** covered
-  configuration migration, diagnostics and disposable GTK controls. Local
-  installed-plugin discovery returned one server with 36 tools for the earlier release.
-- The 2.2 menu/control expansion passed **33 isolated GTK control checks** using
-  the installed Gramps runtime. These cover native editor lifecycles, popup action
-  scopes, multi-file selection, calendar/colour/font controls and rejected inputs.
-  Read-only discovery resolved all **155 actionable menu entries**, **55 GUI tools**
-  and **62 GUI reports** in the installed configuration. This measures action
-  routing, not successful final execution of all those workflows.
-- Eight additional native dialog checks used synthetic in-memory data: the tag
-  editor, four audited tools and three text-report option screens, all cancelled.
-- Public packaging also has a portable `verify_package.py` check. These checks
-  do not establish universal compatibility or a security audit.
-- Live editor/workflow checks cancelled temporary dialogs. Structured writes
-  were exercised only on synthetic in-memory data.
+- The installer targets the Gramps 6.1 add-on folder and registration API.
+  Gramps 6.0, Linux and macOS have not been verified.
 - Third-party add-ons, custom widget types, online services and external report
   dependencies are not universally tested. Discovery or opening a dialog is not
   a guarantee that its final workflow will succeed.
