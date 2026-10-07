@@ -1,5 +1,6 @@
 """Report discovery and native generation with explicit validated destinations."""
 import hashlib
+import math
 import os
 from pathlib import Path
 import tempfile
@@ -53,6 +54,72 @@ def file_states(paths):
             for path in sorted({Path(value) for value in paths if value}, key=str)]
 
 
+def configure_document(support, clr, document, doc_options):
+    from gramps.gen.plug.report._paper import paper_sizes
+    allowed = {'paper', 'orientation', 'margins_cm', 'style', 'css_path'}
+    if not isinstance(document, dict) or set(document) - allowed:
+        raise ValueError('Unknown document settings; use observed paper/orientation/margins/style/CSS fields')
+    papers = [paper for paper in paper_sizes if paper.get_width() > 0 and paper.get_height() > 0]
+    if 'paper' in document:
+        matching = [paper for paper in papers if paper.get_name() == document['paper']]
+        if not matching:
+            raise ValueError('Select an observed paper with positive dimensions')
+        clr.paper = matching[0]
+        clr.options_dict['papers'] = clr.paper.get_name()
+        clr.option_class.handler.set_paper(clr.paper)
+    if 'orientation' in document:
+        if document['orientation'] not in ('portrait', 'landscape'):
+            raise ValueError('Orientation must be portrait or landscape')
+        clr.orien = int(document['orientation'] == 'landscape')
+        clr.options_dict['papero'] = clr.orien
+    margins = document.get('margins_cm', {})
+    if not isinstance(margins, dict) or set(margins) - {'left', 'right', 'top', 'bottom'}:
+        raise ValueError('Margins use left/right/top/bottom centimetres')
+    for name, suffix in (('left', 'l'), ('right', 'r'), ('top', 't'), ('bottom', 'b')):
+        if name in margins:
+            value = margins[name]
+            if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+                raise ValueError('Margins must be finite non-negative numbers')
+            setattr(clr, 'margin' + suffix, value)
+            clr.options_dict['paperm' + suffix] = value
+    width, height = clr.paper.get_width(), clr.paper.get_height()
+    if clr.orien:
+        width, height = height, width
+    if width <= clr.marginl + clr.marginr or height <= clr.margint + clr.marginb:
+        raise ValueError('Paper margins leave no usable page area')
+    clr.option_class.handler.set_orientation(clr.orien)
+    clr.option_class.handler.set_margins([clr.marginl, clr.marginr, clr.margint, clr.marginb])
+    styles = clr.style_list.get_style_names() if clr.style_list else []
+    if 'style' in document:
+        if document['style'] not in styles:
+            raise ValueError('Select an observed native stylesheet')
+        clr.option_class.handler.set_default_stylesheet_name(document['style'])
+        clr.selected_style = clr.style_list.get_style_sheet(document['style'])
+        clr.options_dict['style'] = document['style']
+    if 'css_path' in document:
+        path = Path(document['css_path'])
+        if not path.is_absolute() or not path.is_file() or path.suffix.lower() != '.css':
+            raise ValueError('CSS must be an explicit existing absolute .css path')
+        if clr.options_dict['off'] != 'html':
+            raise ValueError('CSS is available only for HTML')
+        clr.css_filename = str(path)
+        clr.options_dict['css'] = str(path)
+    menu = clr.doc_options.menu if clr.doc_options else None
+    names = menu.get_all_option_names() if menu else []
+    if not isinstance(doc_options, dict) or set(doc_options) - set(names):
+        raise ValueError('Use observed options for the selected document generator')
+    for name in names:
+        option = menu.get_option_by_name(name)
+        if name in doc_options:
+            validate_option(support, option, doc_options[name])
+            option.set_value(doc_options[name])
+            clr.doc_options.options_dict[name] = doc_options[name]
+            clr.options_dict[name] = doc_options[name]
+    return {'papers': [{'name': p.get_name(), 'width_cm': p.get_width(), 'height_cm': p.get_height()} for p in papers],
+            'orientations': ['portrait', 'landscape'], 'styles': styles,
+            'document_options': {name: describe_option(menu.get_option_by_name(name)) for name in names}}
+
+
 def dispatch(workflow, a):
     support = workflow.support
     manager = BasePluginManager.get_instance()
@@ -62,7 +129,7 @@ def dispatch(workflow, a):
     if op == 'list':
         return {'reports': [{'id': p.id, 'name': p.name, 'description': p.description,
                               'category': p.category, 'automatable': p.id in cli_reports and
-                              p.category in (CATEGORY_TEXT, CATEGORY_DRAW, CATEGORY_GRAPHVIZ, CATEGORY_TREE)}
+                              p.category in (CATEGORY_TEXT, CATEGORY_DRAW, CATEGORY_GRAPHVIZ)}
                              for p in all_reports.values()]}
     pdata = all_reports.get(a.get('report_id'))
     if not pdata:
@@ -85,6 +152,8 @@ def dispatch(workflow, a):
     native_options.load_previous_values()
     available_formats = formats(manager, pdata.category)
     supplied = a.get('options', {})
+    if not isinstance(supplied, dict):
+        raise ValueError('Report options must be an object')
     # Apply controlling options in native order so dependent filter choices refresh.
     option_names = native_options.menu.get_all_option_names()
     if set(supplied) - set(option_names):
@@ -96,20 +165,27 @@ def dispatch(workflow, a):
             option.set_value(supplied[name])
     description = {'report_id': pdata.id, 'formats': available_formats, 'options': {
         name: describe_option(native_options.menu.get_option_by_name(name)) for name in option_names}}
-    if op == 'options':
-        return description
-    if op != 'run':
+    if op not in ('run', 'options'):
         raise ValueError('Unknown report operation')
-    output = Path(a.get('output_path', ''))
-    if not output.is_absolute() or not output.parent.is_dir() or output.is_dir():
-        raise ValueError('Supply an absolute output file in an existing directory')
-    format_name = a.get('format')
+    format_name = a.get('format') or (available_formats[0]['format'] if op == 'options' and available_formats else None)
     if format_name not in [item['format'] for item in available_formats]:
         raise ValueError('Select an observed installed output format')
-    if output.suffix.lower() != '.' + format_name.lower():
+    bundle = a.get('bundle', False)
+    if op == 'run' and not a.get('output_path'):
+        raise ValueError('Report generation requires an explicit output path')
+    output = Path(a.get('output_path', str(Path(tempfile.gettempdir()) / ('gramps-options.' + format_name))))
+    if op == 'run' and (not output.is_absolute() or output.is_dir() or
+            (not bundle and not output.parent.is_dir()) or
+            (bundle and (output.parent.exists() or not output.parent.parent.is_dir()))):
+        raise ValueError('Use an existing output directory, or bundle=true with a new bundle directory under an existing parent')
+    if op == 'run' and output.suffix.lower() != '.' + format_name.lower():
         raise ValueError('Output extension must match the selected format')
-    if output.exists() and not a.get('overwrite', False):
+    if op == 'run' and output.exists() and not a.get('overwrite', False):
         raise ValueError('Output exists; choose another path or explicitly request overwrite')
+    if op == 'run' and format_name in ('html', 'svg') and not bundle:
+        raise ValueError('HTML/SVG can generate companions; use bundle=true and a new bundle directory')
+    if op == 'run' and (format_name == 'tex' or pdata.category == CATEGORY_TREE):
+        raise ValueError('Automatic LaTeX/tree generation requires source-media isolation; use the native dialog for this format')
     # Bind all option values to the preview, including implied/default values.
     values = {name: native_options.menu.get_option_by_name(name).get_value() for name in option_names}
     for name in option_names:
@@ -137,9 +213,19 @@ def dispatch(workflow, a):
     options_str = {name: str(value) if not isinstance(value, list) else repr(value) for name, value in values.items()}
     options_str.update(of=str(output), off=format_name)
     clr = CommandLineReport(support.db, pdata.id, pdata.category, option_class, options_str)
-    for name, value in values.items():
-        if clr.option_class.menu.get_option_by_name(name).get_value() != value:
-            raise ValueError('Native report option changed during preparation: ' + name)
+    document_description = configure_document(support, clr, a.get('document', {}), a.get('document_options', {}))
+    for name, value in list(values.items()):
+        actual = clr.option_class.menu.get_option_by_name(name).get_value()
+        if actual != value:
+            if name in supplied:
+                raise ValueError('Native report option changed during preparation: ' + name)
+            values[name] = actual  # Bind native canonical/default resolution too.
+        description['options'][name] = describe_option(clr.option_class.menu.get_option_by_name(name))
+    if op == 'options':
+        return {**description, **document_description, 'format': format_name,
+                'document_settings': {name: value for name, value in clr.options_dict.items() if name != 'of'},
+                'bundle_required': format_name in ('html', 'svg'),
+                'generation_supported': format_name != 'tex' and pdata.category != CATEGORY_TREE}
     settings = {name: value for name, value in clr.options_dict.items() if name != 'of'}
     settings['effective_paper'] = {'name': clr.paper.get_name(), 'width': clr.paper.get_width(),
                                    'height': clr.paper.get_height()}
@@ -156,18 +242,17 @@ def dispatch(workflow, a):
              for handle in getattr(support.db, 'get_%s_handles' % kind)()]
     existing = hashlib.sha256(output.read_bytes()).hexdigest() if output.is_file() else None
     plan = workflow.revision({'report': pdata.id, 'format': format_name, 'output': str(output),
-                              'options': values, 'document_settings': settings, 'input_files': inputs,
+                              'options': values, 'document_settings': settings, 'input_files': inputs, 'bundle': bundle,
                               'records': state, 'existing_output': existing})
     result = {**description, 'output_path': str(output), 'format': format_name,
               'applied': False, 'plan_revision': plan, 'record_count': len(state),
-              'document_settings': settings, 'input_files': inputs}
+              'document_settings': settings, 'input_files': inputs, 'bundle': bundle, **document_description}
     if not a.get('apply', False):
         return result
     if a.get('expected_plan') != plan:
         raise ValueError('Report preview changed or missing; preview again')
-    fd, staging_name = tempfile.mkstemp(prefix='.' + output.stem + '.', suffix=output.suffix, dir=output.parent)
-    os.close(fd)
-    staging = Path(staging_name)
+    stage_folder = tempfile.TemporaryDirectory(prefix='.' + output.stem + '.', dir=output.parent.parent if bundle else output.parent)
+    staging = Path(stage_folder.name) / output.name
     report = None
     try:
         clr.option_class.handler.output = str(staging)
@@ -189,12 +274,21 @@ def dispatch(workflow, a):
         report.end_report()
         if not staging.is_file() or not staging.stat().st_size:
             raise RuntimeError('Report returned without a nonempty staged file')
+        from importlib.util import spec_from_file_location, module_from_spec
+        spec = spec_from_file_location('gramps_report_output', Path(__file__).with_name('report_output.py'))
+        generated = module_from_spec(spec)
+        spec.loader.exec_module(generated)
+        artifacts = generated.manifest(Path(stage_folder.name))
+        if not bundle and len(artifacts) != 1:
+            raise ValueError('This format produced companions; preview a new output bundle')
         if file_states(input_paths) != inputs:
             raise ValueError('Report settings changed during generation; destination preserved')
         current_output = hashlib.sha256(output.read_bytes()).hexdigest() if output.is_file() else None
         if current_output != existing:
             raise ValueError('Output changed during report generation; original destination preserved')
-        if existing is None:
+        if bundle:
+            generated.publish_bundle(Path(stage_folder.name), output.parent, output.name)
+        elif existing is None:
             os.link(staging, output)  # Atomic create; never overwrite an intervening file.
         else:
             os.replace(staging, output)
@@ -206,7 +300,6 @@ def dispatch(workflow, a):
             pass
         raise
     finally:
-        if staging.exists():
-            staging.unlink()
+        stage_folder.cleanup()
     return {**result, 'applied': True, 'file_size': output.stat().st_size,
-            'sha256': hashlib.sha256(output.read_bytes()).hexdigest()}
+            'sha256': hashlib.sha256(output.read_bytes()).hexdigest(), 'artifacts': artifacts}

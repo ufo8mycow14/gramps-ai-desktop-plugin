@@ -386,8 +386,85 @@ def native():
                 pdf_preview = call('report', **pdf_args)
                 call('report', **pdf_args, apply=True, expected_plan=pdf_preview['plan_revision'])
                 check('report_native_pdf_output', (folder / 'summary.pdf').read_bytes().startswith(b'%PDF'))
+            import zipfile
+            for extension in ('rtf', 'odt'):
+                format_args = {**args, 'format': extension, 'output_path': str(folder / ('summary.' + extension))}
+                format_preview = call('report', **format_args)
+                generated = call('report', **format_args, apply=True, expected_plan=format_preview['plan_revision'])
+                contents = Path(format_args['output_path']).read_bytes()
+                check('report_native_' + extension + '_output', generated['applied'] and
+                      (contents.startswith(b'{\\rtf') if extension == 'rtf' else zipfile.is_zipfile(format_args['output_path'])))
+            css = folder / 'custom.css'
+            css.write_text('body { color: #123456; }', encoding='utf-8')
+            html_args = {**args, 'format': 'html', 'output_path': str(folder / 'html-bundle/summary.html'), 'bundle': True,
+                         'document': {'paper': 'A4', 'orientation': 'landscape',
+                                      'margins_cm': {'left': 1, 'right': 1.5, 'top': 2, 'bottom': 2}, 'css_path': str(css)}}
+            html_options = call('report', operation='options', report_id=report_id, format='html')
+            html_args['document']['style'] = html_options['styles'][0]
+            html_preview = call('report', **html_args)
+            check('report_document_settings_bound', html_preview['document_settings']['papero'] == 1 and
+                  html_preview['document_settings']['paperml'] == 1 and html_preview['document_settings']['effective_paper']['name'] == 'A4' and
+                  html_preview['document_settings']['effective_style'] == html_args['document']['style'])
+            html_result = call('report', **html_args, apply=True, expected_plan=html_preview['plan_revision'])
+            html_path = Path(html_args['output_path'])
+            artifacts = html_result['artifacts']
+            check('report_html_manifest_covers_all_files', {item['path'] for item in artifacts} ==
+                  {str(path.relative_to(html_path.parent)) for path in html_path.parent.rglob('*') if path.is_file()} and len(artifacts) > 1)
+            from html.parser import HTMLParser
+            from urllib.parse import urlparse, unquote
+            class References(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.paths = []
+                def handle_starttag(self, tag, attributes):
+                    for name, value in attributes:
+                        if name in ('href', 'src') and value and not urlparse(value).scheme and not value.startswith('#'):
+                            self.paths.append(unquote(urlparse(value).path))
+            references = References()
+            references.feed(html_path.read_text(encoding='utf-8'))
+            check('report_html_companion_references_resolve', bool(references.paths) and
+                  all((html_path.parent / value).is_file() for value in references.paths))
+            check('report_custom_css_published', any(path.read_bytes() == css.read_bytes() for path in html_path.parent.rglob('*.css')))
+            html_before = {str(path): path.read_bytes() for path in html_path.parent.rglob('*') if path.is_file()}
+            reject('report_existing_bundle_rejected', lambda: call('report', **{**html_args, 'overwrite': True}))
+            check('report_existing_bundle_preserved', all(Path(path).read_bytes() == data for path, data in html_before.items()))
+            svg_args = {'operation': 'run', 'report_id': 'ancestor_chart', 'format': 'svg',
+                        'output_path': str(folder / 'svg-bundle/ancestors.svg'), 'bundle': True,
+                        'options': {'pid': person['gramps_id']}, 'document_options': {'svg_background': 'white'}}
+            svg_preview = call('report', **svg_args)
+            svg_result = call('report', **svg_args, apply=True, expected_plan=svg_preview['plan_revision'])
+            check('report_svg_native_option_and_output', svg_preview['document_options']['svg_background']['value'] == 'white' and
+                  b'<svg' in Path(svg_args['output_path']).read_bytes() and bool(svg_result['artifacts']))
+            for document in ({'paper': 'invalid'}, {'orientation': 'diagonal'}, {'margins_cm': {'left': float('nan')}},
+                             {'margins_cm': {'left': 1000}}, {'style': 'missing'}, {'css_path': str(css)}):
+                reject('report_invalid_document_' + str(len(checks)), lambda document=document: call('report',
+                       operation='options', report_id=report_id, format='txt', document=document))
+            reject('report_unknown_document_option_rejected', lambda: call('report', operation='options', report_id='ancestor_chart',
+                   format='svg', document_options={'unknown': True}))
+            reject('report_invalid_document_option_choice_rejected', lambda: call('report', operation='options', report_id='ancestor_chart',
+                   format='svg', document_options={'svg_background': 'invisible'}))
+            reject('report_html_requires_bundle', lambda: call('report', **{**html_args, 'bundle': False, 'output_path': str(folder / 'plain.html')}))
+            reject('report_latex_requires_media_isolation', lambda: call('report', **{**args, 'format': 'tex', 'output_path': str(folder / 'summary.tex')}))
+            import report_output
+            stage = folder / 'publication-stage'
+            stage.mkdir()
+            (stage / 'asset.css').write_text('synthetic', encoding='utf-8')
+            (stage / 'index.html').write_text('synthetic', encoding='utf-8')
+            destination = folder / 'failed-publication'
+            original_link = os.link
+            def fail_main(source, target, *positional, **keywords):
+                if Path(target).name == 'index.html':
+                    raise RuntimeError('Injected bundle publication failure')
+                return original_link(source, target, *positional, **keywords)
+            os.link = fail_main
+            try:
+                reject('report_bundle_publication_failure_reported', lambda: report_output.publish_bundle(stage, destination, 'index.html'))
+            finally:
+                os.link = original_link
+            check('report_bundle_failure_cleans_only_owned_output', not destination.exists() and (stage / 'asset.css').is_file())
             from gramps.gen.plug.report import CATEGORY_GRAPHVIZ, CATEGORY_TREE
             reports = call('report', operation='list')['reports']
+            check('report_tree_automation_restriction_advertised', all(not item['automatable'] for item in reports if item['category'] == CATEGORY_TREE))
             for category, name in ((CATEGORY_GRAPHVIZ, 'graphviz'), (CATEGORY_TREE, 'tree')):
                 candidates = [item for item in reports if item['automatable'] and item['category'] == category]
                 if candidates:

@@ -28,6 +28,18 @@ Choose the relevant route:
   before/after snapshots and `receipt_id`. Rollback is previewed separately and
   requires every affected record to retain its saved revision in this session.
   Use `family_member` for reciprocal family relationships.
+- Bulk attachments: `batch_attach` stages 1–200 ordered operations, grouping
+  repeated owners. Supply original owner and target revisions; preview/apply
+  with `expected_plan`. Use native `reference_patch` for roles/crops/call numbers.
+  Ambiguous removal needs a selector or explicit `all_references: true`.
+  A no-op writes nothing and returns no receipt.
+- Saved plans/receipts: `batch` receipts/receipt reads the latest 100 session
+  receipts. `batch_file` save_plan/export_receipt previews explicit local JSON
+  output before writing with `expected_plan` and `expected_file_revision`;
+  existing files need overwrite. run_plan previews again before record writes.
+  Plans bind backend, canonical tree location/ID and Gramps release; reject
+  stale records, another tree or relocation. inspect checks archives without
+  writes. Receipt exports cannot be imported or used for cross-session rollback.
 - Custom filters: discover `filter` rules for the requested kind; use observed
   native classes and ordered string arguments. Run definitions without editing
   records. Preview save/delete and apply with the current store revision.
@@ -37,6 +49,11 @@ Choose the relevant route:
   with an explicit absolute destination, then apply with `expected_plan`.
   Existing output needs explicit overwrite. Generation stages output and returns
   size/hash; non-automatable categories use native `open` dialogs.
+  Select observed paper/orientation/margins/style/CSS through `document` and
+  generator choices through `document_options`. HTML/SVG require bundle=true
+  inside a new directory under an existing parent; retain the file manifest.
+  Existing bundles cannot be overwritten. Automatic LaTeX/tree generation is
+  restricted pending source-media isolation; use its native dialog.
 - Media management: inspect scoped `media_manage` metadata/missing paths and
   search explicit directories for candidates. Review identity before relinking
   existing files with current revisions and `expected_plan`; retain the batch

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.5.0 — 7 October 2026
+
+- Add `gramps_batch_attach` and `gramps_batch_file`, bringing the plugin to 47
+  tools. Stage 1–200 ordered attachment operations in one native transaction,
+  group repeated owners and guard both owner and target revisions.
+- Preserve native event roles and birth/death indexes, media crops, repository
+  call numbers and nested notes. Require selectors for ambiguous removals.
+- List/read the latest 100 session receipts; export complete JSON evidence and
+  save reviewed plans for execution at the same local tree location/release.
+  Reject stale instructions, changed files and wrong-tree rollback. Receipt
+  import and cross-session rollback are not supported.
+- Expose native paper, orientation, margins, stylesheet, HTML CSS and document
+  generator options. Stage HTML/SVG bundles in a new directory and return every
+  generated file's size/hash; preserve existing bundles and failed destinations.
+- Verify native TXT/PDF/RTF/ODT/HTML/SVG generation. Automatic LaTeX/tree output
+  requires source-media isolation and remains restricted to native dialogs.
+- Pass synthetic bulk/archive checks, native integration checks and package
+  checks. No live family records or media were changed.
+
 ## 2.4.0 — 7 October 2026
 
 - Add dedicated native filters, report automation, media management, authenticated

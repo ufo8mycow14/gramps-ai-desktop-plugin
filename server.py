@@ -12,7 +12,7 @@ from platform_paths import runtime_dir
 
 RUNTIME = runtime_dir() / 'connection.json'
 DEFAULT_EXE = os.environ.get('GRAMPS_EXECUTABLE', '')
-VERSION = '2.4.0'
+VERSION = '2.5.0'
 
 
 def schema(properties=None, required=None):
@@ -150,9 +150,26 @@ change_schema = schema({'kind': KINDS, 'handle': string(), 'expected_revision': 
                         'patch': {'type': 'object'}}, ['kind', 'handle', 'expected_revision', 'patch'])
 tool('batch', 'Preview/apply 1–200 distinct record updates in one native transaction, or preview/perform receipt rollback. '
      'Apply requires the current preview plan. Rollback requires unchanged saved record revisions in this session.',
-     {'operation': {'type': 'string', 'enum': ['update', 'rollback']},
+     {'operation': {'type': 'string', 'enum': ['update', 'rollback', 'receipts', 'receipt']},
       'changes': {'type': 'array', 'items': change_schema}, 'receipt_id': string(),
       'expected_plan': string(), 'apply': {'type': 'boolean'}, 'label': string()})
+attachment_schema = schema({'kind': KINDS, 'handle': string(), 'expected_revision': string(),
+    'target_kind': KINDS, 'target_handle': string(), 'target_revision': string(),
+    'operation': {'type': 'string', 'enum': ['add', 'remove']}, 'reference_patch': {'type': 'object'},
+    'all_references': {'type': 'boolean'}},
+    ['kind', 'handle', 'expected_revision', 'target_kind', 'target_handle', 'target_revision'])
+tool('batch_attach', 'Preview/apply 1–200 ordered tag, note, citation or native reference operations atomically. '
+     'Bind owner/target revisions and a reviewed plan; repeated owner operations share one commit and receipt. '
+     'Ambiguous references need a selector or explicit all_references; family relationships use family_member.',
+     {'changes': {'type': 'array', 'items': attachment_schema}, 'expected_plan': string(),
+      'apply': {'type': 'boolean'}, 'label': string()}, ['changes'])
+tool('batch_file', 'Preview/save local tree-bound batch plans, inspect/run saved plans, or export full receipt JSON. '
+     'Files contain private record data. Writes require reviewed file/plan revisions; archives do not import rollback.',
+     {'operation': {'type': 'string', 'enum': ['save_plan', 'run_plan', 'export_receipt', 'inspect']},
+      'file_path': string(), 'batch_type': {'type': 'string', 'enum': ['update', 'attachments']},
+      'changes': {'type': 'array', 'items': {'type': 'object'}}, 'receipt_id': string(),
+      'label': string(), 'overwrite': {'type': 'boolean'}, 'apply': {'type': 'boolean'},
+      'expected_file_revision': string(), 'expected_plan': string()}, ['operation', 'file_path'])
 tool('media_manage', 'Inspect scoped media metadata/missing paths, find candidates under explicit directories, '
      'or preview/relink existing files transactionally. Never moves or downloads files.',
      {'operation': {'type': 'string', 'enum': ['inspect', 'relink']},
@@ -161,10 +178,11 @@ tool('media_manage', 'Inspect scoped media metadata/missing paths, find candidat
                                                   ['handle', 'expected_revision', 'path'])},
       'refresh_mime': {'type': 'boolean'}, 'apply': {'type': 'boolean'}, 'expected_plan': string(),
       'label': string(), 'offset': integer(), 'limit': integer()})
-tool('report', 'Discover reports and native options/formats; preview/generate text, drawing, Graphviz or tree reports '
+tool('report', 'Discover reports and native options/formats; preview/generate text, drawing or Graphviz reports '
      'at an explicit output path. Validate IDs/choices and confirm current plan before writing; other categories use open.',
      {'operation': {'type': 'string', 'enum': ['list', 'options', 'run', 'open']},
-      'report_id': string(), 'options': {'type': 'object'}, 'format': string(), 'output_path': string(),
+      'report_id': string(), 'options': {'type': 'object'}, 'document': {'type': 'object'},
+      'document_options': {'type': 'object'}, 'bundle': {'type': 'boolean'}, 'format': string(), 'output_path': string(),
       'overwrite': {'type': 'boolean'}, 'apply': {'type': 'boolean'}, 'expected_plan': string()}, ['operation'])
 tool('web', 'Read the explicitly configured authenticated Gramps Web API: status, records, search, history, schema or task. '
      'Configure URL and credentials in local environment variables; never pass or expose tokens in chat.',

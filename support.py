@@ -15,7 +15,7 @@ KINDS = {'person': 'Person', 'family': 'Family', 'event': 'Event', 'place': 'Pla
 METHODS = {'capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
            'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
            'history', 'workflow', 'plugins', 'settings', 'rows', 'date',
-           'filter', 'report', 'batch', 'media_manage', 'sync_apply', 'sync_refs'}
+           'filter', 'report', 'batch', 'batch_attach', 'batch_file', 'media_manage', 'sync_apply', 'sync_refs'}
 
 
 def revision(data):
@@ -161,14 +161,14 @@ class GrampsSupport:
         return {'applied': True, 'before': before, 'after': saved, 'undo_label': label}
 
     def dispatch(self, method, a):
-        if method == 'batch':
+        if method in ('batch', 'batch_attach', 'batch_file'):
             if not hasattr(self, 'batches'):
                 from importlib.util import spec_from_file_location, module_from_spec
                 spec = spec_from_file_location('gramps_desktop_batches', Path(__file__).with_name('batch_support.py'))
                 module = module_from_spec(spec)
                 spec.loader.exec_module(module)
                 self.batches = module.BatchSupport(self, decode, merge_patch, revision)
-            return self.batches.batch(a)
+            return getattr(self.batches, {'batch': 'batch', 'batch_attach': 'attachments', 'batch_file': 'files'}[method])(a)
         if method in ('filter', 'report', 'media_manage', 'sync_apply', 'sync_refs'):
             if not hasattr(self, 'workflows'):
                 from importlib.util import spec_from_file_location, module_from_spec
@@ -495,7 +495,11 @@ class GrampsSupport:
         self.ensure_revision(owner, a.get('expected_revision'))
         target_kind = self.kind(a['target_kind'])
         target = self.get(target_kind, handle=a['target_handle'])
-        op = a.get('operation', 'add')
+        self.prepare_attachment(kind, owner, target_kind, target, a.get('operation', 'add'), a.get('reference_patch'))
+        return self.changed([(kind, owner)], a.get('label', 'MCP ' + target_kind + ' attachment'), a.get('apply', False))
+
+    def prepare_attachment(self, kind, owner, target_kind, target, op, patch=None, strict=False, all_references=False):
+        """Stage one native attachment without committing or touching child notes."""
         if op not in ('add', 'remove'):
             raise ValueError('Use add or remove')
         direct = {'citation': ('get_citation_list', 'add_citation', 'remove_citation'),
@@ -505,6 +509,12 @@ class GrampsSupport:
                 'media': ('get_media_list', 'add_media_reference', 'remove_media_references', lib.MediaRef),
                 'repository': ('get_reporef_list', 'add_repo_reference', 'remove_repo_references', lib.RepoRef)}
         if target_kind in direct:
+            if strict and (patch or all_references):
+                raise ValueError('Direct attachments do not accept reference patches')
+            if strict and target_kind == 'citation' and op == 'add':
+                if not target.get_reference_handle():
+                    raise ValueError('Attach only citations with an existing source')
+                self.get('source', handle=target.get_reference_handle())
             get, add, remove = direct[target_kind]
             if not hasattr(owner, get):
                 raise ValueError('This record type does not support that attachment')
@@ -512,29 +522,62 @@ class GrampsSupport:
             if op == 'add' and not exists:
                 getattr(owner, add)(target.handle)
             elif op == 'remove' and exists:
-                if target_kind == 'citation':
-                    owner.set_citation_list([h for h in owner.get_citation_list() if h != target.handle])
+                if target_kind in ('citation', 'note'):
+                    setter = owner.set_citation_list if target_kind == 'citation' else owner.set_note_list
+                    setter([h for h in getattr(owner, get)() if h != target.handle])
                 else:
                     getattr(owner, remove)(target.handle)
         elif target_kind in refs:
             get, add, remove, cls = refs[target_kind]
             if not hasattr(owner, get):
                 raise ValueError('This record type does not support that reference')
-            existing = next((r for r in getattr(owner, get)() if r.ref == target.handle), None)
-            if op == 'add' and not existing:
+            matches = [r for r in getattr(owner, get)() if r.ref == target.handle]
+            existing = matches[0] if matches else None
+            if strict and all_references and op != 'remove':
+                raise ValueError('all_references is only valid for removing native references')
+            if op == 'add' and (strict or not existing):
                 ref = cls()
                 ref.ref = target.handle
-                if a.get('reference_patch'):
-                    ref = decode(merge_patch(object_to_dict(ref), a['reference_patch']))
+                if target_kind == 'event':
+                    ref.set_role(lib.EventRoleType.FAMILY if kind == 'family' else lib.EventRoleType.PRIMARY)
+                if patch:
+                    ref = decode(merge_patch(object_to_dict(ref), patch))
                     if ref.ref != target.handle:
                         raise ValueError('Reference patch cannot redirect the target')
-                getattr(owner, add)(ref)
+                duplicates = [old for old in matches if old.is_equal(ref)] if strict else []
+                if duplicates:
+                    if not any(object_to_dict(old) == object_to_dict(ref) for old in duplicates):
+                        raise ValueError('Matching native reference has different metadata; edit it explicitly')
+                else:
+                    getattr(owner, add)(ref)
             elif op == 'remove' and existing:
-                getattr(owner, remove)([target.handle])
+                selected = matches
+                if strict and patch:
+                    selected = []
+                    for old in matches:
+                        data = object_to_dict(old)
+                        candidate = decode(merge_patch(data, patch))
+                        if candidate.ref != target.handle:
+                            raise ValueError('Reference selector cannot redirect the target')
+                        if object_to_dict(candidate) == data:
+                            selected.append(old)
+                if strict and len(selected) > 1 and not all_references:
+                    raise ValueError('Ambiguous references; supply a matching selector or all_references=true')
+                if strict or target_kind == 'event':
+                    setters = {'event': owner.set_event_ref_list} if target_kind == 'event' else {
+                        'media': getattr(owner, 'set_media_list', None),
+                        'repository': getattr(owner, 'set_reporef_list', None)}
+                    setters[target_kind]([ref for ref in getattr(owner, get)() if all(ref is not old for old in selected)])
+                else:
+                    getattr(owner, remove)([target.handle])
+            if target_kind == 'event' and kind == 'person':
+                self.db.set_birth_death_index(owner)
         elif kind == 'citation' and target_kind == 'source':
+            if strict and (patch or all_references):
+                raise ValueError('Citation source replacement does not accept a reference patch')
             if op == 'remove':
                 raise ValueError('A citation requires a source; replace the source explicitly')
             owner.set_reference_handle(target.handle)
         else:
             raise ValueError('Unsupported attachment; use named record fields or the native editor')
-        return self.changed([(kind, owner)], a.get('label', 'MCP ' + target_kind + ' attachment'), a.get('apply', False))
+        return owner

@@ -5,7 +5,7 @@ its windows, menus, native editors and already-open family tree. I package it as
 a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
 MCP supplies the tool transport and standalone-client integration.
 
-**Release: 2.4.0 · 45 tools · GPL-2.0-or-later**
+**Release: 2.5.0 · 47 tools · GPL-2.0-or-later**
 
 [Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
 · [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
@@ -24,9 +24,9 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. I provide installation targets for Gramps
 | Navigation and controls | Switch native views; inspect/edit table cells and combo cells; read/set selections; notebook pages; text, toggles, numbers, dates, colours, fonts and file/folder choices | Uses native editor callbacks and control bounds; individual add-on interfaces can differ |
 | Native editing screens | Open existing or unsaved people, families, events, places, sources, citations, repositories, media, notes and tags | Uses normal Gramps editors and their Save/Cancel controls |
 | Structured records | Read schemas and named fields; search by text/field filters; create, update and delete native records | Ten record kinds, including tags; preview by default and revision checks for existing records |
-| Bulk editing | Preview/apply existing-record batches with exact before/after receipts and guarded rollback | 1–200 updates in one transaction; current revisions and preview plan required |
+| Bulk editing | Preview/apply record patches and ordered tag/reference attachments; list/export receipts and save plans | 1–200 operations in one transaction; owner/target revisions and reviewed plans; tree-bound rollback |
 | Custom filters | Discover native rules; build/run definitions; preview/save/delete named filters | Nine namespaces; profile-wide XML store with revision checks and backups; tags use record search |
-| Report automation | Discover installed options/formats; preview and generate native text, drawing, Graphviz and tree reports | Explicit output path and reviewed plan; other report categories use native dialogs |
+| Report automation | Native text, drawing and Graphviz output; paper/orientation/margins/style/CSS and generator options; HTML/SVG bundles | Reviewed destinations; automatic LaTeX/tree generation restricted pending source-media isolation; native dialogs available |
 | Media management | Inspect missing paths and file metadata; search explicit directories; preview/relink records | Existing local files; transactional receipts; no moves or downloads |
 | Gramps Web | Authenticated record/search/backlink/history/schema/task access and scoped push/pull | Explicit server, shared handles/IDs, matching Gramps releases and reviewed tree-bound plans |
 | Relationships | Read parents, partners and children; add/remove parent and child memberships | Reciprocal person/family updates in a transaction; ancestry-cycle checks |
@@ -231,17 +231,58 @@ For rollback, call `gramps_batch` with `operation: "rollback"` and the receipt I
 to preview restoration. Apply with `expected_plan` set to its `plan_revision`.
 Rollback requires every affected record to retain its saved revision; later edits
 are preserved by rejecting a stale receipt. Receipts are retained for the current
-Gramps session, with the latest 100 available for rollback.
+Gramps session, with the latest 100 available for retrieval and rollback. Rollback
+also checks the original tree binding; legacy receipts without that binding are
+readable/exportable but cannot be rolled back.
+
+`gramps_batch_attach` previews **1–200 ordered attachment operations**. Each
+supplies the owner's `kind`, `handle`, `expected_revision`, the target's
+`target_kind`, `target_handle`, `target_revision` and `operation` (`add`/`remove`).
+Repeated owners share one staged record and one commit. All owner operations use
+the original owner revision. Apply with the preview's `expected_plan`.
+
+Supported native combinations include tags, notes, sourced citations, events,
+media, source repository references and citation sources. Optional
+`reference_patch` preserves event roles, crop rectangles and call numbers.
+Distinct references to one target remain distinct. Ambiguous removal requires a
+matching `reference_patch` or explicit `all_references: true`. Person birth/death
+indexes and family event roles follow Gramps conventions; detaching a top-level
+note preserves notes on child references/attributes. No-op attachment batches
+write nothing and return no receipt. Family memberships use `gramps_family_member`.
+
+### Saved plans and exported receipts
+
+Use `gramps_batch` with `operation: "receipts"` to list session receipts and
+`operation: "receipt"` plus `receipt_id` to retrieve exact saved snapshots.
+`gramps_batch_file` provides explicit local JSON archives:
+
+- `save_plan`: supply `batch_type` (`update`/`attachments`), `changes`, optional
+  `label` and an absolute `.json` `file_path` in an existing directory.
+- `run_plan`: preview a saved plan, then apply with its `expected_plan` and
+  `expected_file_revision`. Records and instructions must still match.
+- `export_receipt`: supply `receipt_id` and `file_path` to archive the full receipt.
+- `inspect`: read and check archive integrity without changing files or records.
+
+Saving/exporting also requires preview followed by `expected_plan` and
+`expected_file_revision`; existing files require `overwrite: true`. Files are
+limited to 16 MiB. Plans bind backend, canonical tree save path, native database
+ID and Gramps major/minor release. This is local tree-location identity, not a
+portable UUID: plans can survive a session restart at that location but reject
+another tree, relocation, release change or stale records. In-memory plans are
+session-only and cannot be saved. Receipt exports are durable evidence; receipt
+import and cross-session rollback are not implemented. Integrity hashes detect
+changed content; they do not authenticate an archive's author. Review its changes.
 
 Bulk patches preserve identifiers and cannot directly set change timestamps.
 Native commits update timestamps normally. Reciprocal family
 relationships use `gramps_family_member`. Native Save/OK edits and bulk updates
 share Gramps' database history. I reject bulk writes while native dialogs are open.
 
-I verified **18 isolated bulk-edit checks** using a synthetic SQLite `:memory:`
+I verified **55 isolated bulk/archive checks** using a synthetic SQLite `:memory:`
 database, including mixed-record updates, zero-write previews, stale/invalid batch
 rejection, injected transaction failure with complete rollback, saved change
-receipts and guarded restoration. No live family records were changed.
+receipts, reference selectors, saved-plan reuse and guarded restoration. No live
+family records were changed.
 
 ### Custom filters
 
@@ -264,12 +305,27 @@ Native options expose types, choices and bounds. Preview `run` with an absolute
 `output_path`, matching extension and installed `format`; apply using the returned
 `plan_revision` as `expected_plan`. Existing destinations require `overwrite: true`.
 
+Use `document` for observed `paper`, `orientation` (`portrait`/`landscape`),
+`margins_cm` (`left`/`right`/`top`/`bottom`), `style` and an existing absolute
+HTML `css_path`. `document_options` accepts the selected generator's observed
+choices, such as SVG `svg_background`. Native types, choices and usable page
+area are validated.
+
+HTML/SVG require `bundle: true` and an output inside a **new directory** under an
+existing parent, for example `/exports/new-summary/summary.html`. Companions are
+published before the main file; `artifacts` lists every file's relative path,
+size and SHA-256. Existing bundle directories are preserved; bundle overwrite
+is unsupported.
+
 I bind record revisions, effective option/document settings, style/configuration
 file revisions and the existing destination to
 the preview. Generation uses a temporary file; failed generation preserves the
 destination. Successful receipts include size and SHA-256. Available text/drawing
-formats depend on installed document generators; Graphviz/tree formats need their
-native dependencies. Other report categories use `open` and their native dialogs.
+formats depend on installed document generators; I verified TXT, PDF, RTF, ODT,
+HTML and drawing SVG. Graphviz needs its native dependencies. Automatic LaTeX
+and tree generation is restricted because native converters can write beside
+source media; use `open` and the native dialog. The listing/options distinguish
+automatic generation support from available formats.
 
 ### Media management
 
@@ -312,13 +368,13 @@ After an uncertain write outcome, inspect task/history before retrying. I verifi
 this adapter against a local mock API; a live authenticated Web server remains
 untested. API 3.23.1 targets Gramps 6.0, so it cannot sync with a 6.1 desktop.
 
-## All 45 tools
+## All 47 tools
 
 | Group | Tools |
 | --- | --- |
 | Connection | `gramps_launch`, `gramps_status`, `gramps_health`, `gramps_capabilities` |
 | Desktop | `gramps_windows`, `gramps_widgets`, `gramps_widget`, `gramps_menus`, `gramps_menu`, `gramps_cells`, `gramps_actions`, `gramps_action`, `gramps_views`, `gramps_view`, `gramps_rows`, `gramps_selection`, `gramps_editor`, `gramps_screenshot`, `gramps_job`, `gramps_python` |
-| Records | `gramps_records`, `gramps_record`, `gramps_schema`, `gramps_object`, `gramps_find`, `gramps_mutate`, `gramps_batch` |
+| Records | `gramps_records`, `gramps_record`, `gramps_schema`, `gramps_object`, `gramps_find`, `gramps_mutate`, `gramps_batch`, `gramps_batch_attach`, `gramps_batch_file` |
 | Relationships and references | `gramps_relatives`, `gramps_links`, `gramps_family_member`, `gramps_attach` |
 | Merges | `gramps_compare`, `gramps_merge` |
 | Context | `gramps_media_info`, `gramps_research`, `gramps_date` |
@@ -350,7 +406,7 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.4.0**, with **45 tools**.
+The plugin package and adapter/bridge API are **2.5.0**, with **47 tools**.
 
 | Check | Verified result |
 | --- | --- |
@@ -360,11 +416,11 @@ The plugin package and adapter/bridge API are **2.4.0**, with **45 tools**.
 | Expanded native GTK controls | 33 isolated checks covering cell-editor lifecycles, popup scopes, file selection, numeric/calendar/colour/font controls and rejected inputs |
 | Native dialog access | Eight synthetic open/inspect/cancel checks: tag editor; `dupfind`, `eventcmp`, `mediaman`, `editowner`; `ancestor_report`, `descend_report`, `summary` |
 | Installed menu and plugin routing | 155 actionable menu entries, 55 GUI tools and 62 GUI reports resolved in the tested configuration |
-| Bulk-edit expansion | 18 isolated native checks on synthetic data, including injected transaction failure and guarded rollback |
+| Bulk/archive expansion | 55 isolated native checks on synthetic data, including atomic failures, reference identity/indexes, wrong-tree rollback, saved-plan reuse and archive integrity |
 | Earlier plugin discovery | Version 2.2.1 exposed all 39 baseline tools; version 2.3.1 adds `gramps_batch` |
-| Dedicated integrations | 57 isolated native checks covering all nine filter namespaces, legacy aliases, persistence, text/PDF output, failed-output preservation, stale layout rejection, media relinking and guarded Web pull |
+| Dedicated integrations | 79 isolated native checks covering nine filter namespaces, TXT/PDF/RTF/ODT/HTML/SVG, document settings/CSS, bundle manifests/failure cleanup, media relinking and guarded Web pull |
 | Web and portable paths | 38 offline mock API/path checks covering authentication, previews, conflicts, dependency guards, task states and platform/version paths |
-| Portable public package | Four grouped offline checks passed; fresh public installation used matching packaged sources; downloaded release ZIP matched the checked archive |
+| Portable public package | Five grouped offline checks passed; fresh public installation used matching packaged sources; downloaded release ZIP matched the checked archive |
 
 I exercised structured writes only on synthetic in-memory data. Live editor and
 workflow checks cancelled temporary dialogs. Menu discovery and options-dialog
