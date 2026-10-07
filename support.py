@@ -8,14 +8,15 @@ from pathlib import Path
 from gramps.gen import lib
 from gramps.gen.db import DbTxn
 from gramps.gen.lib.json_utils import object_to_dict, data_to_object
+VERSION = '2.7.0'
 
 KINDS = {'person': 'Person', 'family': 'Family', 'event': 'Event', 'place': 'Place',
          'source': 'Source', 'citation': 'Citation', 'repository': 'Repository',
          'media': 'Media', 'note': 'Note', 'tag': 'Tag'}
 METHODS = {'capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
            'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
-           'history', 'workflow', 'plugins', 'settings', 'rows', 'date',
-           'filter', 'report', 'export', 'batch', 'batch_attach', 'batch_file', 'media_manage', 'sync_apply', 'sync_refs'}
+           'history', 'workflow', 'plugins', 'settings', 'rows', 'date', 'secondary', 'navigation', 'gramplets',
+           'filter', 'report', 'export', 'graph', 'audit', 'tree', 'batch', 'batch_attach', 'batch_file', 'media_manage', 'sync_apply', 'sync_refs'}
 
 
 def revision(data):
@@ -161,6 +162,36 @@ class GrampsSupport:
         return {'applied': True, 'before': before, 'after': saved, 'undo_label': label}
 
     def dispatch(self, method, a):
+        if method in ('secondary', 'schema', 'date', 'settings', 'navigation', 'gramplets'):
+            from importlib.util import spec_from_file_location, module_from_spec
+            filename = {'secondary': 'secondary_support.py', 'schema': 'secondary_support.py',
+                        'date': 'date_support.py', 'settings': 'preference_support.py',
+                        'navigation': 'navigation_support.py', 'gramplets': 'navigation_support.py'}[method]
+            spec = spec_from_file_location('gramps_extended_' + method, Path(__file__).with_name(filename))
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+            if method == 'date':
+                return module.dispatch(a)
+            if method == 'schema':
+                return module.schema(self, a)
+            if method == 'settings':
+                if not hasattr(self, 'preferences'):
+                    self.preferences = module.Preferences(self, revision)
+                return self.preferences.dispatch(a)
+            if method == 'secondary':
+                return module.dispatch(self, a, decode, merge_patch, revision)
+            return module.navigation(self, a) if method == 'navigation' else module.gramplets(self, a, revision)
+        if method in ('graph', 'audit', 'tree'):
+            from importlib.util import spec_from_file_location, module_from_spec
+            filename = 'tree_support.py' if method == 'tree' else 'analysis_support.py'
+            spec = spec_from_file_location('gramps_desktop_' + method, Path(__file__).with_name(filename))
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+            if method == 'tree':
+                if not hasattr(self, 'tree_metadata'):
+                    self.tree_metadata = module.TreeSupport(self, revision)
+                return self.tree_metadata.dispatch(a)
+            return getattr(module.Analysis(self), method)(a)
         if method in ('batch', 'batch_attach', 'batch_file'):
             if not hasattr(self, 'batches'):
                 from importlib.util import spec_from_file_location, module_from_spec
@@ -180,9 +211,14 @@ class GrampsSupport:
         if method == 'capabilities':
             from gramps.version import VERSION as gramps_version
             import sys
-            return {'version': '2.4.0', 'gramps_version': gramps_version, 'platform': sys.platform,
+            return {'version': VERSION, 'gramps_version': gramps_version, 'platform': sys.platform,
                     'kinds': KINDS, 'structured_methods': sorted(METHODS),
                     'integrations': ['native_filters', 'native_reports', 'atomic_batch_updates',
+                                     'atomic_batch_attachments', 'saved_batch_plans_receipts', 'native_exports_backups',
+                                     'filtered_private_living_exports', 'recorded_relationship_graph',
+                                     'scoped_reference_duplicate_inspection', 'reviewed_tree_metadata',
+                                     'typed_schema_choices', 'embedded_record_edits', 'native_date_operations',
+                                     'reviewed_profile_preferences', 'record_navigation', 'native_gramplet_bars',
                                      'media_inspection_relink', 'configured_gramps_web', 'scoped_web_sync'],
                     'native_editors': list(KINDS), 'merge_kinds': [k for k in KINDS if k != 'tag'],
                     'writes': 'Native DbTxn with record revisions; preview unless apply=true',
@@ -192,16 +228,6 @@ class GrampsSupport:
                                'Web sync requires equal Gramps release lines and an explicit target tree',
                                'Add-on dependencies and external service access still apply',
                                'No automatic sync to the project master GEDCOM', 'No genealogical decision inferred from a match']}
-        if method == 'schema':
-            kind = self.kind(a['kind'])
-            obj = getattr(lib, KINDS[kind])()
-            return {'kind': kind, 'template': object_to_dict(obj),
-                    'immutable_on_update': ['handle', 'gramps_id', '_class', 'change'],
-                    'methods': [name for name in dir(obj) if name.startswith(('get_', 'set_', 'add_', 'remove_'))]}
-        if method == 'date':
-            from gramps.gen.datehandler import parser, displayer
-            date = parser.parse(a['text'])
-            return {'data': object_to_dict(date), 'display': displayer.display(date), 'valid': date.is_valid()}
         if method in ('object', 'links', 'media_info', 'research'):
             kind = a.get('kind', 'media' if method == 'media_info' else 'person')
             obj = self.get(kind, a.get('handle'), a.get('gramps_id'))
@@ -394,38 +420,34 @@ class GrampsSupport:
             raise ValueError('Unknown workflow')
         if method == 'plugins':
             from gramps.gen.plug import PluginRegister
-            from gramps.gui.uimanager import valid_action_name
             register = PluginRegister.get_instance()
+            from importlib.util import spec_from_file_location, module_from_spec
+            spec = spec_from_file_location('gramps_plugin_details', Path(__file__).with_name('navigation_support.py'))
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+            if a.get('operation', 'list') != 'list':
+                return module.visibility(self, a, revision)
             group = a.get('kind', 'report')
             functions = {'report': 'report_plugins', 'tool': 'tool_plugins', 'import': 'import_plugins',
                          'export': 'export_plugins', 'view': 'view_plugins', 'gramplet': 'gramplet_plugins',
                          'database': 'database_plugins'}
-            if group not in functions:
+            from gramps.gen.plug._pluginreg import PTYPE, PTYPE_STR
+            if group == 'types':
+                return [{'code': code, 'label': PTYPE_STR[code]} for code in PTYPE]
+            if group == 'all' or a.get('plugin_type') is not None:
+                codes = PTYPE if group == 'all' else [a['plugin_type']]
+                if any(type(code) is not int or code not in PTYPE for code in codes):
+                    raise ValueError('Select an observed native plugin type')
+                items = [p for code in codes for p in register.type_plugins(code)]
+            elif group not in functions:
                 raise ValueError('Unsupported plugin group')
-            items = getattr(register, functions[group])()
+            else:
+                items = getattr(register, functions[group])()
             window = self.bridge.uistate.window
             result = []
             for p in items:
-                action_name = valid_action_name(p.id)
-                action = window.lookup_action(action_name)
-                result.append({'id': p.id, 'name': p.name, 'version': p.version, 'description': p.description,
-                               'action_name': action_name, 'action_available': action is not None,
-                               'action_enabled': action.get_enabled() if action else False,
-                               'supported': bool(getattr(p, 'supported', True))})
+                result.append(module.plugin_details(p, window))
             return result
-        if method == 'settings':
-            from gramps.gen.config import config
-            if a.get('operation', 'get') == 'keys':
-                return [section + '.' + key for section in config.get_sections() for key in config.get_section_settings(section)]
-            key = a['key']
-            previous = config.get(key)
-            if a.get('operation', 'get') == 'set':
-                value = a['value']
-                if type(value) is not type(previous):
-                    raise ValueError('Preference type must match the existing setting')
-                config.set(key, value)
-                config.save()
-            return {'key': key, 'value': config.get(key), 'previous': previous}
         raise ValueError('Unknown structured Gramps command')
 
     def family_member(self, a):

@@ -12,7 +12,7 @@ from platform_paths import runtime_dir
 
 RUNTIME = runtime_dir() / 'connection.json'
 DEFAULT_EXE = os.environ.get('GRAMPS_EXECUTABLE', '')
-VERSION = '2.6.0'
+VERSION = '2.7.0'
 
 
 def schema(properties=None, required=None):
@@ -95,7 +95,8 @@ tool('job', 'Read a running operation after a timeout. Never repeat a potentiall
 selector = {'kind': KINDS, 'handle': string(), 'gramps_id': string()}
 apply_fields = {'apply': {'type': 'boolean'}, 'label': string()}
 tool('capabilities', 'Discover structured support and installed-version limits.', readonly=True)
-tool('schema', 'Read a native named-field template before creating or patching a record.', {'kind': KINDS}, ['kind'], True)
+tool('schema', 'Read native named fields, recursive JSON schema, stable type codes and custom choices. '
+     'Supply kind or an observed class_name, including embedded native objects.', {'kind': KINDS, 'class_name': string()}, readonly=True)
 tool('object', 'Read native named fields and the revision required for updates.', selector, ['kind'], True)
 tool('find', 'Search the open tree by text and dotted native field filters, with pagination.',
      {'kind': KINDS, 'query': string(), 'filters': {'type': 'array', 'items': schema({'field': string(),
@@ -103,7 +104,27 @@ tool('find', 'Search the open tree by text and dotted native field filters, with
       'limit': integer(), 'offset': integer(), 'include_data': {'type': 'boolean'}}, readonly=True)
 tool('relatives', 'Read recorded parents, partners, children and family relationships without inferring identity.',
      {'handle': string(), 'gramps_id': string()}, readonly=True)
+tool('graph', 'Inspect recorded ancestors/descendants, common ancestors or a shortest recorded family path. '
+     'Preserve all parent families and native link types; bounded search reports truncation and broken links, never proof of genealogy.',
+     {'operation': {'type': 'string', 'enum': ['ancestors', 'descendants', 'common_ancestors', 'path']},
+      'handle': string(), 'gramps_id': string(), 'target_handle': string(), 'target_gramps_id': string(),
+      'max_depth': integer(), 'max_nodes': integer(), 'max_edges': integer(), 'max_inspections': integer(),
+      'relation_codes': {'type': 'array', 'items': integer()}, 'include_partners': {'type': 'boolean'},
+      'include_self': {'type': 'boolean'}}, ['operation'], True)
+tool('audit', 'Read-only scoped reference/reciprocity inspection or transparent duplicate candidates. '
+     'No repair, merge or historical identity decision. Supply explicit records or a seed and bounded candidate pool.',
+     {'operation': {'type': 'string', 'enum': ['references', 'duplicates']},
+      'records': {'type': 'array', 'items': schema({'kind': KINDS, 'handle': string()}, ['kind', 'handle'])},
+      'kind': KINDS, 'handle': string(), 'gramps_id': string(),
+      'candidate_handles': {'type': 'array', 'items': string()}, 'max_inspections': integer()}, ['operation'], True)
 tool('links', 'Read outgoing references and backlinks for a record.', selector, ['kind'], True)
+tool('secondary', 'List/read precisely selected embedded native objects, or preview/update their metadata and note/citation attachments. '
+     'Updates require current owner and secondary revisions; target identities stay fixed.',
+     {**selector, 'operation': {'type': 'string', 'enum': ['list', 'get', 'update', 'attach']},
+      'path': {'type': 'array', 'items': {'oneOf': [{'type': 'string'}, {'type': 'integer'}]}},
+      'expected_revision': string(), 'expected_secondary_revision': string(), 'patch': {'type': 'object'},
+      'target_kind': {'type': 'string', 'enum': ['note', 'citation']}, 'target_handle': string(),
+      'target_revision': string(), 'action': {'type': 'string', 'enum': ['add', 'remove']}, **apply_fields}, ['kind'])
 tool('mutate', 'Preview or apply a native transactional create/update/delete. Updates/deletes require a current revision. '
      'Family relationships use family_member. apply defaults to false; genealogy write authority is separate.',
      {**selector, **apply_fields, 'operation': {'type': 'string', 'enum': ['create', 'update', 'delete']},
@@ -132,13 +153,36 @@ tool('workflow', 'Open native import/export/backup/tree manager/preferences/add-
      'Opening a dialog does not authorise its final write or upload.',
      {'operation': {'type': 'string', 'enum': ['import', 'export', 'backup', 'trees', 'history', 'addons',
       'reports', 'tools', 'preferences', 'report', 'tool']}, 'action_name': string()}, ['operation'])
-tool('plugins', 'List installed Gramps reports, tools, importers, exporters, views, gramplets or database backends.',
-     {'kind': {'type': 'string', 'enum': ['report', 'tool', 'import', 'export', 'view', 'gramplet', 'database']}}, readonly=True)
-tool('settings', 'Read keys/preferences or set an explicitly requested preference with its existing native type.',
-     {'operation': {'type': 'string', 'enum': ['keys', 'get', 'set']}, 'key': string(), 'value': {}})
+tool('plugins', 'Inspect installed native registry categories, loaded/hidden state, declared dependencies and recorded load failures. '
+     'kind=types discovers type codes; kind=all includes every registration. Preview/hide/unhide one plugin with its current plan; the bridge is protected.',
+     {'kind': {'type': 'string', 'enum': ['report', 'tool', 'import', 'export', 'view', 'gramplet', 'database', 'types', 'all']},
+      'plugin_type': integer(), 'operation': {'type': 'string', 'enum': ['list', 'hide', 'unhide']},
+      'plugin_id': string(), 'expected_plan': string(), 'apply': {'type': 'boolean'}})
+tool('settings', 'Read preference keys/defaults, explicitly set one key, or preview/update up to 50 profile-wide preferences with guarded receipts/rollback. '
+     'Callbacks run immediately; multi-key changes use compensating restoration and are not atomic or record undo.',
+     {'operation': {'type': 'string', 'enum': ['keys', 'get', 'set', 'update', 'receipts', 'receipt', 'rollback']},
+      'key': string(), 'value': {}, 'changes': {'type': 'object'}, 'receipt_id': string(),
+      'expected_plan': string(), 'apply': {'type': 'boolean'}})
+tool('navigation', 'Read native active-record/history state or activate a verified handle/ID and navigate back/forward in an observed group.',
+     {**selector, 'operation': {'type': 'string', 'enum': ['get', 'activate', 'back', 'forward']}, 'nav_group': integer()})
+tool('gramplets', 'Inspect/add/remove/select native sidebar or bottombar Gramplets on the active view. '
+     'Use available IDs and the current layout revision. Adding loads installed code and runs its lifecycle.',
+     {'operation': {'type': 'string', 'enum': ['list', 'add', 'remove', 'select']},
+      'location': {'type': 'string', 'enum': ['sidebar', 'bottombar']}, 'name': string('Observed Gramplet ID'),
+      'expected_revision': string()})
+tool('tree', 'Read/preview/update native ordered bookmarks, home person or researcher metadata. '
+     'Apply needs the current plan; session/tree-bound receipts allow guarded rollback. Metadata does not use record undo history.',
+     {'operation': {'type': 'string', 'enum': ['get', 'set', 'receipts', 'receipt', 'rollback']},
+      'field': {'type': 'string', 'enum': ['bookmarks', 'home', 'researcher']}, 'kind': KINDS,
+      'value': {}, 'receipt_id': string(), 'expected_plan': string(), 'apply': {'type': 'boolean'}}, ['operation'])
 tool('rows', 'Read paginated rows/choices from a discovered native GTK TreeView or ComboBox.',
      {'widget_id': string(), 'parent_path': string(), 'limit': integer(), 'offset': integer()}, ['widget_id'], True)
-tool('date', 'Parse and display a genealogical date using the installed Gramps date handler.', {'text': string()}, ['text'], True)
+tool('date', 'Parse/format/compare native dates without changing records or global display preferences. '
+     'Convert calendars or offset signed days only for exact complete dates with no slash/new-year ambiguity. '
+     'options discovers formats/calendars; identity compares the complete native representation.',
+     {'operation': {'type': 'string', 'enum': ['parse', 'format', 'compare', 'calendar', 'offset', 'options']},
+      'text': string(), 'other_text': string(), 'format_index': integer(), 'calendar': {}, 'days': integer(),
+      'comparison': {'type': 'string', 'enum': ['identity', '=', '<', '>', '<=', '>=', '<<', '>>']}}, readonly=True)
 
 tool('filter', 'Discover native filter rules, build/run custom filters and preview/save/delete profile-wide filters. '
      'Saving/deleting requires the current store revision. Tags use find; native filters cover nine kinds.',
@@ -184,12 +228,18 @@ tool('report', 'Discover reports and native options/formats; preview/generate te
       'report_id': string(), 'options': {'type': 'object'}, 'document': {'type': 'object'},
       'document_options': {'type': 'object'}, 'bundle': {'type': 'boolean'}, 'format': string(), 'output_path': string(),
       'overwrite': {'type': 'boolean'}, 'apply': {'type': 'boolean'}, 'expected_plan': string()}, ['operation'])
-tool('export', 'List/preview/write whole-tree native XML, compressed Gramps XML, GEDCOM or portable media packages; '
-     'backup selects native XML with optional media. Includes private/living records; no filtering. '
+tool('export', 'List/preview/write native XML, compressed Gramps XML, GEDCOM or portable media packages; '
+     'run supports native private/living/person filtering. Defaults include private/living records. Backup preserves the whole tree. '
      'Apply requires the reviewed plan and explicit destination; missing package media is rejected by default.',
      {'operation': {'type': 'string', 'enum': ['list', 'run', 'backup']},
       'format': {'type': 'string', 'enum': ['gramps', 'xml', 'gedcom', 'gpkg']}, 'output_path': string(),
       'include_media': {'type': 'boolean'}, 'allow_missing_media': {'type': 'boolean'},
+      'exclude_private': {'type': 'boolean'},
+      'living_mode': {'type': 'string', 'enum': ['include', 'exclude', 'surname_only', 'name_only', 'redact']},
+      'current_year': integer(), 'years_after_death': integer(),
+      'person_handles': {'type': 'array', 'items': string()},
+      'person_filter': schema({'name': string(), 'definition': {'type': 'object'}, 'store_path': string()}),
+      'linked_only': {'type': 'boolean'}, 'include_tree_metadata': {'type': 'boolean'},
       'overwrite': {'type': 'boolean'}, 'apply': {'type': 'boolean'}, 'expected_plan': string()}, ['operation'])
 tool('web', 'Read the explicitly configured authenticated Gramps Web API: status, records, search, history, schema or task. '
      'Configure URL and credentials in local environment variables; never pass or expose tokens in chat.',

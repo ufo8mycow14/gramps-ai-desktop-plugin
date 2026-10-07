@@ -1,5 +1,6 @@
 """Offline release checks; no Gramps launch, database access or user config edits."""
 import json
+import ast
 import os
 from pathlib import Path
 import subprocess
@@ -15,12 +16,24 @@ def main():
     checks = []
     for name in ('server.py', 'desktop_bridge.py', 'support.py', 'configure.py',
                  'DesktopControl.py', 'DesktopControl.gpr.py', 'package_release.py', 'verify_support.py',
-                 'ui_support.py', 'verify_menu_support.py', 'batch_support.py', 'batch_files.py', 'workflow_support.py',
+                 'ui_support.py', 'verify_menu_support.py', 'batch_support.py', 'batch_files.py', 'analysis_support.py', 'tree_support.py',
+                 'secondary_support.py', 'date_support.py', 'preference_support.py', 'navigation_support.py', 'workflow_support.py',
                  'native_filters.py', 'native_reports.py', 'report_output.py', 'report_media.py', 'native_exports.py', 'web_support.py', 'platform_paths.py',
-                 'install.py', 'verify_batch.py', 'verify_integrations.py'):
+                 'install.py', 'verify_batch.py', 'verify_integrations.py', 'verify_expansion.py'):
         compile((root / name).read_text(encoding='utf-8'), name, 'exec')
     checks.append('source_compiles')
     manifest = json.loads((root / '.codex-plugin/plugin.json').read_text())
+    assert manifest['version'] == server.VERSION
+    for name in ('desktop_bridge.py', 'support.py'):
+        parsed = ast.parse((root / name).read_text(encoding='utf-8'))
+        versions = [ast.literal_eval(node.value) for node in parsed.body if isinstance(node, ast.Assign)
+                    and any(isinstance(target, ast.Name) and target.id == 'VERSION' for target in node.targets)]
+        assert versions == [server.VERSION], name
+    addon = ast.parse((root / 'DesktopControl.gpr.py').read_text(encoding='utf-8'))
+    versions = [ast.literal_eval(keyword.value) for node in ast.walk(addon) if isinstance(node, ast.Call)
+                for keyword in node.keywords if keyword.arg == 'version']
+    assert versions == [server.VERSION]
+    checks.append('manifest_server_bridge_support_addon_versions_match')
     marketplace = json.loads((root / '.agents/plugins/marketplace.json').read_text())
     plugin_id = manifest['name'] + '@' + marketplace['name']
     assert marketplace['plugins'][0]['source']['path'] == './'
@@ -63,13 +76,13 @@ def main():
     assert replies[2]['error']['code'] == -32600
     assert replies[3]['id'] == 3 and replies[3]['result'] == {}
     tools = replies[4]['result']['tools']
-    assert len(tools) == 48 and len({t['name'] for t in tools}) == 48
+    assert len(tools) == 54 and len({t['name'] for t in tools}) == 54
     assert any('1–200' in tool['description'] for tool in tools)
     checks.append('utf8_stdio_under_windows_legacy_encoding')
     readme = (root / 'README.md').read_text(encoding='utf-8')
     assert all('`' + tool['name'] + '`' in readme for tool in tools)
     assert 'GNU GENERAL PUBLIC LICENSE' in (root / 'LICENSE').read_text()
-    checks.append('malformed_request_error_then_ping_and_48_documented_tools')
+    checks.append('malformed_request_error_then_ping_and_54_documented_tools')
     print(json.dumps({'passed': len(checks), 'checks': checks, 'family_data_access': False}))
 
 

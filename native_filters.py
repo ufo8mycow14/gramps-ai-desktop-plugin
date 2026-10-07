@@ -56,7 +56,7 @@ def load_store(path):
     return store
 
 
-def dispatch(workflow, a):
+def dispatch(workflow, a, all_handles=False, database=None):
     support = workflow.support
     kind = a.get('kind', 'person')
     if kind not in NAMESPACES:
@@ -130,9 +130,11 @@ def dispatch(workflow, a):
         old_store = filters.CustomFilters
         try:
             filters.set_custom_filters(store)
-            found = sorted(filt.apply(support.db, id_list=handles, user=None))
+            found = sorted(filt.apply(database or support.db, id_list=handles, user=None))
         finally:
             filters.set_custom_filters(old_store)
+        if all_handles:
+            return {'handles': found, 'definition': definition(filt), 'store_revision': current}
         offset, limit = max(0, a.get('offset', 0)), max(1, min(a.get('limit', 50), 200))
         return {'definition': definition(filt), 'total': len(found),
                 'records': [support.summary(kind, support.get(kind, handle=h)) for h in found[offset:offset + limit]],

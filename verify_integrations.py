@@ -722,6 +722,8 @@ def native():
             data['family_list'] = ['missing-family']
             reject('web_pull_dangling_relationship_rejected', lambda: call('sync_apply', changes=[{**pull[0],
                    'expected_revision': read('person', person['handle'])['revision'], 'data': data}]))
+            import verify_expansion
+            checks.extend(verify_expansion.run(service, folder))
     finally:
         db.close()
     return {'passed': len(checks), 'checks': checks, 'synthetic_database': ':memory:', 'live_family_record_writes': 0}

@@ -18,6 +18,21 @@ Choose the relevant route:
 - Record data: `find`, `schema`, `object`, `links`, `relatives`, `research`, `date`
   and `media_info`. Use pagination and stable handles. Search results and record
   associations are leads, not identity or relationship conclusions.
+- Typed/embedded fields: `schema` provides recursive schemas, stable native type
+  codes and custom choices for a kind or class_name. `secondary` lists exact
+  paths/revisions; preview/apply metadata with current owner and secondary
+  revisions. Its attach operation requires target revision; preserve identities,
+  citations and event indexes. Wrong classes/date shapes must be rejected.
+- Dates: `date` options/format/compare are detached and preserve UI formatting.
+  Calendar/day offsets require exact full dates with January-1 new year and no
+  slash year. Native interval matches are conventions, never historical proof.
+- Recorded graphs/audits: `graph` retains parent families/link types, bounds
+  nodes/edges/depth/inspections and reports incomplete searches. `audit` uses
+  explicit records/candidate pools; inspect matched/different/missing fields.
+  Warnings and duplicate candidates do not authorise repair or merge.
+- Tree metadata: `tree` previews ordered bookmarks/home/researcher changes with
+  target revisions and expected_plan. Retain session/tree-bound receipts for
+  guarded rollback; metadata follows native persistence rather than record undo.
 - Authorised structured edits: read current `object` revisions, preview `mutate`,
   `family_member`, `attach` or `merge`, inspect the proposed change, then apply
   within existing task authority. Use `family_member` for reciprocal family links.
@@ -58,7 +73,12 @@ Choose the relevant route:
   restricted; use its native dialog. Individual tree add-ons are unverified.
 - Exports/backups: `export` lists installed supported formats; preview whole-tree
   XML/compressed XML/GEDCOM/gpkg output with an absolute destination and apply
-  with `expected_plan`. Includes private/living records without filtering.
+  with `expected_plan`. Defaults include private/living records. run also accepts
+  explicit person_handles or a native person_filter, exclude_private and native
+  living modes/year/death interval. Filters run after redaction; scoped reference
+  closure trims excluded links. Filtered metadata is omitted by default; explicit
+  include_tree_metadata may include private researcher/name-group details.
+  Backups reject partial scopes or metadata omission. Review returned scope/counts.
   Backup defaults to native XML; include_media selects a portable gpkg package
   with reviewed original paths and hashes. Reject missing/remote media unless
   explicitly allowing an incomplete package; retain its missing-media receipt.
@@ -94,7 +114,17 @@ Choose the relevant route:
 - Reports, tools, import/export, backup, tree manager and add-ons: use `plugins`
   and `workflow`, then inspect the actual dialog. Opening it does not authorise
   its final file write, import, download or external upload. `settings` reads
-  preferences; set only changes requested by the current task.
+  preferences/defaults; set only changes requested by the current task. update
+  previews 1–50 profile-wide keys with expected_plan, receipts and guarded
+  rollback. Callbacks are not atomic; compensation reports residual mismatches,
+  unrelated side effects remain, and native save errors may only be logged.
+  plugins kind=types/all includes the full registry and separates loaded/hidden
+  from menu availability; hide/unhide needs a plan and cannot hide the bridge.
+- Navigation/Gramplets: navigation uses verified handles/IDs and native history
+  in observed groups. gramplets lists compatible IDs on sidebar/bottombar; use
+  expected_revision for add/remove/select. Adding executes installed code's
+  lifecycle. Individual third-party behaviour remains unverified; Dashboard uses
+  native UI controls.
   Report/tool IDs are normalised to native action names automatically. Some tools
   write/process data or contact services inside their constructor; there is no
   universal cancellable options screen. Read the tool's purpose before activation.

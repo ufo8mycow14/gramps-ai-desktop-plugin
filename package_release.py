@@ -9,8 +9,9 @@ FILES = (
     'README.md', 'LICENSE', 'CHANGELOG.md', '.gitignore',
     '.codex-plugin/plugin.json', '.agents/plugins/marketplace.json',
     'skills/gramps/SKILL.md', 'server.py', 'desktop_bridge.py', 'support.py', 'ui_support.py',
-    'batch_support.py', 'batch_files.py', 'workflow_support.py', 'native_filters.py', 'native_reports.py', 'report_output.py', 'report_media.py',
-    'native_exports.py', 'web_support.py', 'platform_paths.py', 'install.py', 'verify_batch.py', 'verify_integrations.py',
+    'batch_support.py', 'batch_files.py', 'analysis_support.py', 'tree_support.py', 'secondary_support.py', 'date_support.py',
+    'preference_support.py', 'navigation_support.py', 'workflow_support.py', 'native_filters.py', 'native_reports.py', 'report_output.py', 'report_media.py',
+    'native_exports.py', 'web_support.py', 'platform_paths.py', 'install.py', 'verify_batch.py', 'verify_integrations.py', 'verify_expansion.py',
     'DesktopControl.py', 'DesktopControl.gpr.py', 'configure.py', 'install.ps1',
     'verify_package.py', 'verify_support.py', 'verify_menu_support.py', 'package_release.py',
 )

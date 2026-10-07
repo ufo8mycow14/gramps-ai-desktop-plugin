@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.7.0 — 7 October 2026
+
+- Add graph, audit, tree metadata, embedded record, navigation and Gramplet tools,
+  bringing the catalogue to 54. Preserve recorded links, relationship types,
+  ordered bookmarks and revision-bound metadata/record changes.
+- Add reviewed private/living/person-filter exports with linked-record closure,
+  permitted metadata links and detached relative media paths. Keep backups whole.
+- Expose recursive native schemas, stable type codes/custom choices, precision-safe
+  dates, complete registry diagnostics and reviewed plugin visibility changes.
+- Add profile preference previews/receipts/guarded rollback, with explicit callback
+  compensation and persistence limits. Keep legacy parse/single-preference calls.
+- Reject graph inspection overflow, ambiguous Gramplets, wrong embedded classes,
+  inconsistent date shapes, stale secondary targets and unsafe bridge hiding.
+- Extend synthetic native and package/version checks; preserve live session and
+  existing batch, tree-metadata and preference receipts during local refresh.
+- Retain external compiler, third-party lifecycle, Web authentication and other
+  actual GTK-host limitations; no live genealogy or media mutation.
+
 ## 2.6.0 — 7 October 2026
 
 - Add `gramps_export`, bringing the plugin to 48 tools: reviewed native XML,

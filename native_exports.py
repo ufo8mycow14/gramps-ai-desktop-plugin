@@ -1,5 +1,6 @@
 """Reviewed native whole-tree exports and portable XML/media backups."""
 import copy
+from datetime import date
 import hashlib
 from io import BytesIO
 import os
@@ -14,6 +15,113 @@ from gramps.gen.utils.file import media_path_full
 FORMATS = {'gramps': ('ex_gramps', '.gramps'), 'xml': ('ex_gramps', '.xml'),
            'gedcom': ('ex_ged', '.ged'), 'gpkg': ('ex_gpkg', '.gpkg')}
 KINDS = ('person', 'family', 'event', 'place', 'source', 'citation', 'repository', 'media', 'note', 'tag')
+BOOKMARKS = {'person': 'bookmarks', 'family': 'family_bookmarks', 'event': 'event_bookmarks',
+             'place': 'place_bookmarks', 'source': 'source_bookmarks', 'citation': 'citation_bookmarks',
+             'repository': 'repo_bookmarks', 'media': 'media_bookmarks', 'note': 'note_bookmarks'}
+
+
+class ScopedMetadata:
+    """Never export bookmarks/home links to excluded records or implicit private tree metadata."""
+    def __init__(self, db, include_metadata, filtered, rewrite_media):
+        from types import SimpleNamespace
+        self._db, self._include, self._rewrite_media = db, include_metadata, rewrite_media
+        self.members = {kind: set(getattr(db, 'get_%s_handles' % kind)()) for kind in KINDS}
+        self.name_formats = db.name_formats if include_metadata else []
+        for kind, name in BOOKMARKS.items():
+            values = [h for h in getattr(db, name).get() if not filtered or h in self.members[kind]]
+            setattr(self, name, SimpleNamespace(get=lambda values=values: list(values)))
+
+    def __getattr__(self, name):
+        if name.startswith('get_') and name[4:] in BOOKMARKS.values():
+            return lambda: getattr(self, name[4:])
+        return getattr(self._db, name)
+
+    def get_default_handle(self):
+        handle = self._db.get_default_handle()
+        return handle if handle in self.members['person'] else None
+
+    def get_default_person(self):
+        handle = self.get_default_handle()
+        return self._db.get_person_from_handle(handle) if handle else None
+
+    def get_researcher(self):
+        from gramps.gen.lib import Researcher
+        return self._db.get_researcher() if self._include else Researcher()
+
+    def get_mediapath(self):
+        return self._db.get_mediapath() if self._include else None
+
+    def get_media_from_handle(self, handle):
+        media = copy.deepcopy(self._db.get_media_from_handle(handle))
+        raw = media.get_path()
+        if self._rewrite_media and raw and not ('://' in raw and urlsplit(raw).scheme):
+            media.set_path(str(Path(media_path_full(self._db, raw)).resolve()))
+        return media
+
+    def get_name_group_keys(self):
+        return self._db.get_name_group_keys() if self._include else []
+
+
+def export_view(workflow, a):
+    from gramps.gen.proxy import PrivateProxyDb, LivingProxyDb, FilterProxyDb, ReferencedBySelectionProxyDb
+    from gramps.gen.config import config
+    db = workflow.support.db
+    mode = a.get('living_mode', 'include')
+    modes = {'include': 99, 'exclude': 0, 'surname_only': 1, 'name_only': 2, 'redact': 3}
+    if mode not in modes:
+        raise ValueError('Select an observed living_mode')
+    year, interval = a.get('current_year', date.today().year), a.get('years_after_death', 0)
+    if type(year) is not int or not 1 <= year <= 9999 or type(interval) is not int or not 0 <= interval <= 150:
+        raise ValueError('Use current_year 1–9999 and years_after_death 0–150')
+    handles = a.get('person_handles')
+    person_filter = a.get('person_filter')
+    if handles is not None and person_filter is not None:
+        raise ValueError('Select explicit person_handles or a native person_filter')
+    if handles is not None:
+        if not isinstance(handles, list) or len(handles) > 10000 or any(not isinstance(h, str) for h in handles) or len(set(handles)) != len(handles):
+            raise ValueError('Supply up to 10,000 distinct existing person handles')
+        for handle in handles:
+            workflow.support.get('person', handle=handle)
+    active = bool(a.get('exclude_private', False) or mode != 'include' or handles is not None or person_filter is not None or a.get('linked_only', False))
+    if active and a.get('linked_only') is False:
+        raise ValueError('Filtered/privacy exports require linked-only reference closure')
+    include_metadata = a.get('include_tree_metadata', not active)
+    if a.get('operation') == 'backup' and (active or not include_metadata):
+        raise ValueError('Backups preserve the whole tree and its metadata; use run for scoped/privacy exports')
+    view = PrivateProxyDb(db) if a.get('exclude_private', False) else db
+    if mode != 'include':
+        view = LivingProxyDb(view, modes[mode], year, interval)
+    filter_state = None
+    if person_filter is not None:
+        if not isinstance(person_filter, dict) or set(person_filter) - {'name', 'definition', 'store_path'}:
+            raise ValueError('person_filter accepts name/definition and an optional native store_path')
+        from importlib.util import spec_from_file_location, module_from_spec
+        spec = spec_from_file_location('gramps_export_person_filters', Path(__file__).with_name('native_filters.py'))
+        module = module_from_spec(spec)
+        spec.loader.exec_module(module)
+        filter_state = module.dispatch(workflow, {'operation': 'run', 'kind': 'person', **person_filter}, all_handles=True, database=view)
+        handles = filter_state['handles']
+    if active:
+        permitted = set(handles) if handles is not None else set(view.iter_person_handles())
+        class Selection:
+            def apply(self, database, id_list=None, user=None):
+                return permitted & set(database.iter_person_handles())
+        view = FilterProxyDb(view, Selection())
+    if active:
+        view = ReferencedBySelectionProxyDb(view, all_people=True)
+    source_view = view  # Resolve original relative media paths before omitting tree metadata.
+    is_package = a.get('format') == 'gpkg' or (a.get('operation') == 'backup' and a.get('include_media', False))
+    view = ScopedMetadata(view, include_metadata, active, not include_metadata and not is_package)
+    living_settings = {key: config.get(key) for key in ('preferences.private-given-text', 'preferences.private-surname-text',
+                       'behavior.max-age-prob-alive', 'behavior.max-sib-age-diff', 'behavior.avg-generation-gap',
+                       'behavior.min-generation-years', 'behavior.max-gen-estimate')} if mode != 'include' else {}
+    scope = {'whole_tree': not active, 'exclude_private': a.get('exclude_private', False), 'living_mode': mode,
+             'current_year': year if mode != 'include' else None, 'years_after_death': interval if mode != 'include' else None,
+             'selected_person_handles': sorted(handles) if handles is not None else None,
+             'linked_only': active, 'include_tree_metadata': include_metadata,
+             'filter': filter_state, 'living_settings': living_settings,
+             'proxy_order': ['private', 'living', 'person', 'reference', 'metadata']}
+    return view, source_view, scope
 
 
 def digest(path):
@@ -124,7 +232,9 @@ def dispatch(workflow, a):
         return {'formats': [{'format': name, 'extension': spec[1], 'exporter_id': spec[0],
                              'name': exporters[spec[0]].name, 'includes_media_files': name == 'gpkg',
                              'lossless_native': name != 'gedcom'} for name, spec in available.items()],
-                'scope': 'Whole open tree, including private and living records; no filtering',
+                'scope': 'Whole-tree by default; run supports native private/living/person filters and linked-only records',
+                'living_modes': ['include', 'exclude', 'surname_only', 'name_only', 'redact'],
+                'backup_scope': 'Whole tree with metadata; no filtering',
                 'database_changed': False}
     if operation not in ('run', 'backup'):
         raise ValueError('Use list, run or backup')
@@ -142,31 +252,33 @@ def dispatch(workflow, a):
         raise ValueError('Output exists; explicitly request overwrite or choose a new file')
     db = support.db
     protect_destination(db, output)
+    view, source_view, scope = export_view(workflow, a)
     state = [{'kind': kind, 'handle': handle, 'revision': support.snapshot(kind, support.get(kind, handle=handle))['revision']}
              for kind in KINDS for handle in sorted(getattr(db, 'get_%s_handles' % kind)())]
-    media = media_inputs(db) if format_name == 'gpkg' else []
+    media = media_inputs(source_view) if format_name == 'gpkg' else []
     missing = [item['handle'] for item in media if not item['exists']]
     if missing and not a.get('allow_missing_media', False):
         raise ValueError('Media package is incomplete; repair missing files or explicitly set allow_missing_media')
     if format_name != 'gpkg' and a.get('allow_missing_media', False):
         raise ValueError('allow_missing_media is available only for media packages')
     support.dispatch('batch', {'operation': 'receipts'})
-    metadata = {'media_base': db.get_mediapath(), 'default_person': db.get_default_handle(),
-                'tree': support.batches.context(), 'researcher': db.get_researcher().serialize(),
-                'bookmarks': {name: getattr(db, name).get() for name in
+    metadata = {'media_base': view.get_mediapath(), 'default_person': view.get_default_handle(),
+                'tree': support.batches.context(), 'researcher': view.get_researcher().serialize(),
+                'bookmarks': {name: getattr(view, name).get() for name in
                               ('bookmarks', 'family_bookmarks', 'event_bookmarks', 'place_bookmarks',
                                'source_bookmarks', 'citation_bookmarks', 'repo_bookmarks', 'media_bookmarks', 'note_bookmarks')},
-                'name_formats': db.name_formats,
-                'name_groups': {key: db.get_name_group_mapping(key) for key in db.get_name_group_keys()}}
+                'name_formats': view.name_formats,
+                'name_groups': {key: view.get_name_group_mapping(key) for key in view.get_name_group_keys()}}
+    exported = [{'kind': kind, 'handle': handle, 'revision': support.snapshot(kind, getattr(view, 'get_%s_from_handle' % kind)(handle))['revision']}
+                for kind in KINDS for handle in sorted(view.members[kind])]
     existing = digest(output) if output.exists() else None
     plan = workflow.revision({'operation': operation, 'format': format_name, 'output': str(output),
                               'records': state, 'metadata': metadata, 'media': media, 'existing': existing,
-                              'allow_missing_media': a.get('allow_missing_media', False)})
+                              'allow_missing_media': a.get('allow_missing_media', False), 'scope': scope, 'exported': exported})
     result = {'applied': False, 'plan_revision': plan, 'format': format_name, 'output_path': str(output),
-              'record_counts': {kind: sum(item['kind'] == kind for item in state) for kind in KINDS},
-              'scope': 'Whole open tree, including private and living records; no filtering',
+              'record_counts': {kind: len(view.members[kind]) for kind in KINDS}, 'scope': scope,
               'media': media, 'missing_media': missing, 'media_complete': not missing,
-              'includes_media_files': format_name == 'gpkg', 'lossless_native': format_name != 'gedcom',
+              'includes_media_files': format_name == 'gpkg', 'lossless_native': format_name != 'gedcom' and scope['whole_tree'] and scope['include_tree_metadata'],
               'database_changed': False}
     if not a.get('apply', False):
         return result
@@ -174,8 +286,8 @@ def dispatch(workflow, a):
         raise ValueError('Export preview missing or changed; preview again')
     with tempfile.TemporaryDirectory(prefix='.' + output.stem + '.', dir=output.parent) as temp:
         staged = Path(temp) / output.name
-        generate(db, staged, format_name, media, manager)
-        if format_name == 'gpkg' and media_inputs(db) != media:
+        generate(view, staged, format_name, media, manager)
+        if format_name == 'gpkg' and media_inputs(source_view) != media:
             raise ValueError('Source media changed during export; destination preserved')
         if output.is_symlink() or (digest(output) if output.exists() else None) != existing:
             raise ValueError('Destination changed during export; destination preserved')
