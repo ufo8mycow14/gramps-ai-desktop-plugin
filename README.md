@@ -5,7 +5,7 @@ its windows, menus, native editors and already-open family tree. I package it as
 a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
 MCP supplies the tool transport and standalone-client integration.
 
-**Release: 2.8.0 · 54 tools · GPL-2.0-or-later**
+**Release: 2.9.0 · 58 tools · GPL-2.0-or-later**
 
 [Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
 · [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
@@ -19,15 +19,18 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. I provide installation targets for Gramps
 
 | Area | Supported operations | Scope |
 | --- | --- | --- |
-| Connection | Health, version/readiness diagnostics, session status and launching an explicitly located Gramps executable | Reuses the running bridge and open database |
+| Connection | Health, version/readiness diagnostics, session status, guarded automatic lock recovery and launching an explicitly located Gramps executable | Reuses the running bridge and open database; verified abandoned local Windows SQLite locks recover automatically |
 | Windows and menus | Discover full native menu paths, targets, action scopes and enabled states; activate current menu paths and buttons; capture window screenshots | Covers main menus, GTK context menus and widget-local popups; stale menu revisions are rejected |
 | Navigation and controls | Switch native views; inspect/edit table cells and combo cells; read/set selections; notebook pages; text, toggles, numbers, dates, colours, fonts and file/folder choices | Uses native editor callbacks and control bounds; individual add-on interfaces can differ |
 | Native editing screens | Open existing or unsaved people, families, events, places, sources, citations, repositories, media, notes and tags | Uses normal Gramps editors and their Save/Cancel controls |
 | Structured records | Read recursive schemas, type choices and named fields; search, create/update/delete; edit embedded objects; add/remove/reorder typed record details | Ten record kinds; exact paths, owner/item/collection revisions, native schema and reload checks |
-| Bulk editing | Preview/apply record patches and ordered tag/reference attachments; list/export receipts and save plans | 1–200 operations in one transaction; owner/target revisions and reviewed plans; tree-bound rollback |
+| Bulk editing | Preview/apply record patches, ordered attachments and native create/delete/merge batches; inspect exact proposed changes and receipts | 1–200 operations in one transaction; detached lifecycle prediction, final survivor mappings and guarded rollback |
 | Custom filters | Discover native rules; build/run definitions; preview/save/delete named filters | Nine namespaces; profile-wide XML store with revision checks and backups; tags use record search |
 | Report automation | Native text, drawing, Graphviz, LaTeX and tree-source output; layout/style/CSS and generator options; companion bundles | Source image hashes and isolated derived assets; automatic tree PDF compilation restricted |
-| Exports and backups | Reviewed native XML, compressed Gramps XML, GEDCOM and portable XML/media packages; person filters/private/living controls | Whole-tree defaults; filtered reference closure and metadata omission; backups preserve the whole tree |
+| Exports and backups | Reviewed XML/compressed XML, GEDCOM, portable XML/media packages, CSV, Web Family Tree, GeneWeb, vCalendar and vCard | Privacy/person scopes; format loss receipts; native XML/media backups preserve the whole tree |
+| Import and restoration | Reviewed native XML, GEDCOM, CSV and GeneWeb imports; XML restoration into an empty tree | Binds file bytes/destination/settings; explicit prompt policy, partial outcomes and receipts; native imports have no generic dry run or atomic rollback |
+| Tree lifecycle | Discover exact trees/backends; create SQLite trees, open/close, rename closed trees and preserve removed trees | Reviewed plans and native-state receipts; removal moves the tree to an explicit preservation directory |
+| Specialised details | Person associations, enclosing-place references, LDS ordinances, styled-note tags and alternate-name promotion | Native targets, cycle/range guards and collection/item revisions; prior primary names are preserved |
 | Media management | Inspect missing paths and file metadata; search explicit directories; preview/relink records | Existing local files; transactional receipts; no moves or downloads |
 | Gramps Web | Authenticated record/search/backlink/history/schema/task access and scoped push/pull | Explicit server, shared handles/IDs, matching Gramps releases and reviewed tree-bound plans |
 | Relationships | Read parents, partners and children; add/remove parent and child memberships | Reciprocal person/family updates in a transaction; ancestry-cycle checks |
@@ -131,9 +134,30 @@ Use the same Python executable you supplied to the installer. A ready connection
 reports `connected: true`, `version_match: true` and `ready: true`. Do not share
 the connection discovery file: it contains the local bearer token.
 
-If an older local package is installed under another marketplace name, disable
-that older package before enabling this one so the client has one desktop server.
-Do not force-unlock a tree or launch repeated Gramps processes to obtain access.
+The installer disables known legacy plugin identities when selecting this package
+and preserves unrelated configuration. Registration precedes local loader writes;
+local write failure restores owned snapshots where possible, and rerunning the
+installer recovers an interrupted installation.
+`--runtime-dir` / `-RuntimeDirectory` binds the adapter and loader to an explicit
+absolute discovery directory when packaged hosts use another local AppData path.
+
+### Automatic database access and lock recovery
+
+I use the database already opened by Gramps. Its active lock stays in place:
+the plugin accesses that same database on the application's GTK thread.
+Reopening the same tree through the plugin reuses the shared database.
+
+When the exact selected or autoloaded tree has an abandoned lock, I recover it
+automatically before native opening. On Windows this requires a local fixed-drive
+SQLite tree directly under the configured database directory, a matching local
+user/host, no native recovery marker, no other Gramps process or database-file
+owner, and successful exclusive file checks. The opening handoff reserves the
+files and marker; failed or cancelled openings release the temporary guards.
+
+Active owners, uncertain ownership, foreign locks, network locations, other
+backends and native recovery requirements remain blocked. I do not stop another
+process or break its lock. `gramps_status` reports the latest `lock_recovery`
+outcome. Recovery is installed by the startup add-on before native autoload.
 
 ### Standalone MCP client
 
@@ -254,6 +278,64 @@ indexes and family event roles follow Gramps conventions; detaching a top-level
 note preserves notes on child references/attributes. No-op attachment batches
 write nothing and return no receipt. Family memberships use `gramps_family_member`.
 
+### Native record lifecycle batches
+
+`gramps_batch_records` reviews **1–200 ordered create/delete/merge operations**.
+I predict the complete result in a detached native SQLite tree, including native
+handle/ID allocation, backlink cleanup, indirect related merges and home-person
+changes. No preview writes to the open tree. Use `max_records` to bound inspection
+(default 50,000; maximum 200,000).
+
+Creates supply `kind`, `client_id` and `patch`; later operations can reference
+`$new:client_id`. Deletes supply `handle` and its original `expected_revision`.
+Merges supply `keep_handle`/`remove_handle` and their original revisions. Person
+`choices` can independently select `primary_name`, `gender` and `gramps_id` from
+`keep` or `remove`; other kinds use native merge rules and the selected survivor.
+Review `proposed`, `created_handles`, `merge_mappings` and the final `mapping`.
+A survivor deleted later has a null mapping rather than a misleading live handle.
+
+Apply with the retained `expected_plan` while the entire inspected tree remains
+unchanged. The delta commits in one native transaction. Receipts include actual
+record readback, home metadata and `outcome`; an indeterminate readback blocks
+automatic rollback and requires inspection before any retry. `receipt`, `receipts`
+and reviewed `rollback` are session-bound. Rollback preserves later edits and
+references by rejecting stale restoration; home metadata has separate guards.
+Saved update/attachment archives below do not yet include these lifecycle plans.
+
+### Specialised record details
+
+`gramps_details` adds native lifecycle operations for person associations,
+enclosing-place references, LDS ordinances and styled-note tags. Use its observed
+field/template, owner revision, collection/item revision and target revisions.
+Review add/update/remove/reorder plans before applying `expected_plan`; enclosing
+places reject cycles and styled tags preserve native ranges and internal links.
+Alternate-name `promote` retains the complete old primary name and existing
+alternate names. Generic secondary updates cannot bypass these target/range guards.
+
+### Import, restoration and native trees
+
+`gramps_import` lists installed importers. `run` supports `im_gramps`, `im_ged`,
+`im_csv` and `im_geneweb` with an absolute input `file_path`. Preview binds the
+input hash/size/time, exact destination records/metadata, native settings and
+`prompt_policy` (`reject` by default, or reviewed `accept`). Apply requires that
+same `expected_plan`. The preview describes execution; the native importer
+determines changes while running and provides no generic dry run or atomic undo.
+
+`restore` requires native XML and an empty destination. I suppress extra import
+tags during restoration and restore the original feature afterwards. Receipts
+include before/after counts, warnings, prompts and completed/failed/cancelled/
+indeterminate outcomes. Partial or unverified writes remain explicit; inspect the
+receipt before retrying. Packaged-media restoration still uses the native dialog.
+
+`gramps_database` lists exact trees/backends and reviews SQLite `create`, native
+`open`/`close`, closed-tree `rename` and `delete`. Select the observed `tree_path`,
+then apply its current plan. `delete` moves that closed tree into a fresh explicit
+`preservation_path` outside the tree root on the same volume; it does not purge
+the database. Opening can close the previous tree before a native load failure.
+Receipts expose partial/indeterminate outcomes and any preserved creation files
+or residual lock. Other backend setup/migration and legacy repair retain native
+routes and their prerequisites.
+
 ### Saved plans and exported receipts
 
 Use `gramps_batch` with `operation: "receipts"` to list session receipts and
@@ -341,7 +423,9 @@ dialog. The options response exposes format-specific generation support.
 `gramps_export` with `operation: "list"` shows supported installed formats.
 Preview `run` with `format` and an absolute `output_path`, then apply with the
 returned `plan_revision` as `expected_plan`. Formats are `gramps` (`.gramps`,
-compressed native XML), `xml` (`.xml`), `gedcom` (`.ged`) and `gpkg` (`.gpkg`).
+compressed native XML), `xml` (`.xml`), `gedcom` (`.ged`), `gpkg` (`.gpkg`),
+`csv` (`.csv`), `web_family_tree` (`.wft`), `geneweb` (`.gw`),
+`vcalendar` (`.vcs`) and `vcard` (`.vcf`).
 Existing files require `overwrite: true`; failed generation preserves them.
 Destinations cannot replace referenced media or reside in the active native
 database directory. I return record counts, scope, file size and SHA-256.
@@ -360,6 +444,13 @@ They omit researcher/name-group/media-base metadata by default; explicit
 `include_tree_metadata: true` includes it. Relative non-package media paths are
 resolved on detached copies when their base metadata is omitted.
 `operation: "backup"` rejects partial/privacy scopes or metadata omission.
+
+CSV options are the native booleans `include_individuals`, `include_marriages`,
+`include_children`, `include_places` and `translate_headers`. Enclosing-place
+cycles are rejected before CSV generation. Web Family Tree is an interchange
+file; GeneWeb can omit unconnected people/single-parent families; vCalendar
+contains recurring complete Gregorian anniversaries; vCard contains contacts.
+These formats and GEDCOM return loss semantics and are not complete backups.
 
 GEDCOM follows the native writer and can lose Gramps-specific data;
 use native XML/package backups for restoration. Exports do not replace the open
@@ -514,18 +605,18 @@ After an uncertain write outcome, inspect task/history before retrying. I verifi
 this adapter against a local mock API; a live authenticated Web server remains
 untested. API 3.23.1 targets Gramps 6.0, so it cannot sync with a 6.1 desktop.
 
-## All 54 tools
+## All 58 tools
 
 | Group | Tools |
 | --- | --- |
 | Connection | `gramps_launch`, `gramps_status`, `gramps_health`, `gramps_capabilities` |
 | Desktop | `gramps_windows`, `gramps_widgets`, `gramps_widget`, `gramps_menus`, `gramps_menu`, `gramps_cells`, `gramps_actions`, `gramps_action`, `gramps_views`, `gramps_view`, `gramps_navigation`, `gramps_gramplets`, `gramps_rows`, `gramps_selection`, `gramps_editor`, `gramps_screenshot`, `gramps_job`, `gramps_python` |
-| Records | `gramps_records`, `gramps_record`, `gramps_schema`, `gramps_object`, `gramps_find`, `gramps_mutate`, `gramps_secondary`, `gramps_audit`, `gramps_batch`, `gramps_batch_attach`, `gramps_batch_file` |
+| Records | `gramps_records`, `gramps_record`, `gramps_schema`, `gramps_object`, `gramps_find`, `gramps_mutate`, `gramps_secondary`, `gramps_details`, `gramps_audit`, `gramps_batch`, `gramps_batch_attach`, `gramps_batch_records`, `gramps_batch_file` |
 | Relationships and references | `gramps_relatives`, `gramps_graph`, `gramps_links`, `gramps_family_member`, `gramps_attach` |
 | Merges | `gramps_compare`, `gramps_merge` |
 | Context | `gramps_media_info`, `gramps_research`, `gramps_date` |
 | Workflows | `gramps_history`, `gramps_workflow`, `gramps_plugins`, `gramps_settings`, `gramps_tree` |
-| Dedicated workflows | `gramps_filter`, `gramps_report`, `gramps_export`, `gramps_media_manage` |
+| Dedicated workflows | `gramps_filter`, `gramps_report`, `gramps_export`, `gramps_import`, `gramps_database`, `gramps_media_manage` |
 | Gramps Web | `gramps_web`, `gramps_web_sync` |
 
 ## Access, privacy and backups
@@ -552,7 +643,7 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.8.0**, with **54 tools**.
+The plugin package and adapter/bridge API are **2.9.0**, with **58 tools**.
 
 | Check | Verified result |
 | --- | --- |
@@ -567,8 +658,10 @@ The plugin package and adapter/bridge API are **2.8.0**, with **54 tools**.
 | Dedicated integrations | 232 isolated native checks, including 15 unittest flows for typed detail lifecycles, date arithmetic and Dashboard controls, alongside filters, privacy exports/backups, reports, graphs, metadata and profile controls |
 | Web and portable paths | 38 offline mock API/path checks covering authentication, previews, conflicts, dependency guards, task states and platform/version paths |
 | Portable public package | Six grouped offline checks, including version consistency; fresh public installation and downloaded archive readback |
+| Version 2.9 additions | 41 native unittest methods, including 15 existing detail/date/Dashboard flows and 26 lifecycle/import/export/detail/lock flows; 24 installer/Windows lock methods, seven package/protocol groups and 38 offline Web/path checks |
 
-I exercised structured writes only on synthetic in-memory data. Live editor and
+I exercised structured writes on synthetic memory databases and disposable native
+SQLite trees. Live editor and
 workflow checks cancelled temporary dialogs. Menu discovery and options-dialog
 checks do not certify a workflow's final output, and these checks do not
 establish universal compatibility or a security audit.
@@ -612,9 +705,11 @@ profile/database; never use a live tree for those development checks.
 
 If health reports `discovery_missing`, confirm the loader is installed and reopen
 Gramps normally. For `bridge_unreachable`, inspect the actual Gramps process and
-startup errors before launching again. For `version_mismatch`, save work and
-reopen Gramps to load the matching bridge. For `dialogs_open`, finish or cancel
-the observed dialog. Reconnect the client if tools are missing after installation.
+startup errors before launching again. For `version_mismatch`, compare the actual
+adapter/bridge versions: update or select the intended adapter when it is stale;
+save work and reopen Gramps when its loaded bridge is stale. For `dialogs_open`,
+finish or cancel the observed dialog. Reconnect the client if tools are missing
+after installation.
 
 To remove the integration, disable `gramps-desktop@gramps-desktop-plugins` in
 the client's plugin settings and remove only its workspace configuration block.

@@ -222,6 +222,12 @@ def prepare(value: Any, original: Any, decode: Callable) -> Any:
     prior: Any
     if isinstance(value, dict):
         prior = original if isinstance(original, dict) else {}
+        if value.get("_class") == "LdsOrd" and any(value.get(key) != prior.get(key) for key in ("place", "famc")):
+            raise ValueError("LDS targets use revision-checked specialised details")
+        if value.get("_class") == "StyledText" and value.get("tags") != prior.get("tags", []):
+            raise ValueError("Styled tags use range-checked specialised details")
+        if value.get("_class") == "StyledTextTag" and value != prior:
+            raise ValueError("Styled tags use range-checked specialised details")
         for key, item in value.items():
             if (
                 key in ("ref", "handle", "gramps_id", "change", "sortval", "_class")

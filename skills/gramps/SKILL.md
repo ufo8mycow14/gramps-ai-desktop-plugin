@@ -9,12 +9,36 @@ Gramps startup add-on shares the application's open database and GTK main thread
 Read `gramps_health`, `gramps_status` and `gramps_capabilities` first. Health works
 with Gramps closed and flags bridge version/startup/dialog problems without
 exposing credentials. Launch only when disconnected and Gramps is closed;
-do not create another tree or force-unlock a database to obtain access.
+reuse the running tree. Verified abandoned local Windows SQLite locks recover
+automatically on exact selected/autoloaded opening. Preserve active/uncertain
+owners, foreign/network locks and native recovery requirements; inspect the
+status lock_recovery outcome instead of forcing an unlock.
 Allow startup prompts and view initialisation to finish before tree/navigation
 workflows; inspect any error rather than treating a connected bridge as an idle UI.
 
 Choose the relevant route:
 
+- Tree lifecycle: `database` lists exact trees/backends and previews SQLite
+  creation/open/close, closed-tree rename and removal into an explicit same-volume
+  preservation directory outside the tree root. Apply needs expected_plan;
+  inspect actual/partial/indeterminate receipts, especially after native failure.
+- Import/restore: `import` discovers installed formats. Preview XML/GEDCOM/CSV/
+  GeneWeb input hashes, destination/settings and prompt_policy before apply.
+  Empty-tree XML restore suppresses extra import tags. Native import has no
+  generic dry run or atomic rollback; preserve warnings/partial outcomes and
+  inspect the receipt before any retry. Package-media restoration uses native UI.
+- Native lifecycle batches: `batch_records` predicts 1–200 create/delete/merge
+  operations on a fully detached database. Bind original selection revisions;
+  earlier creations use $new:client_id. Review full proposed delta, native IDs,
+  implicit/transitive merge mappings and home changes. Person choices select
+  primary_name/gender/gramps_id independently; other kinds retain native rules.
+  Apply requires the retained plan and unchanged inspected tree. Indeterminate
+  readback retains its receipt and blocks automatic rollback; later edits and
+  references must remain protected. These plans/receipts remain session-bound.
+- Specialised details: `details` handles person associations, enclosing places,
+  LDS ordinances, styled tags and alternate-name promotion. Discover exact native
+  fields/templates and supply owner/collection/item/target revisions. Preserve
+  cycles, LDS classes/statuses, note ranges/internal links and all prior names.
 - Record data: `find`, `schema`, `object`, `links`, `relatives`, `research`, `date`
   and `media_info`. Use pagination and stable handles. Search results and record
   associations are leads, not identity or relationship conclusions.
@@ -80,7 +104,10 @@ Choose the relevant route:
   restricted; use its native dialog. Individual tree add-ons are unverified.
 - Exports/backups: `export` lists installed supported formats; preview whole-tree
   XML/compressed XML/GEDCOM/gpkg output with an absolute destination and apply
-  with `expected_plan`. Defaults include private/living records. run also accepts
+  with `expected_plan`. Defaults include private/living records. Formats include
+  CSV/Web Family Tree/GeneWeb/vCalendar/vCard with explicit loss semantics.
+  CSV exposes five native boolean options and rejects place cycles. These are
+  lossy formats; use XML/media backups for restoration. run also accepts
   explicit person_handles or a native person_filter, exclude_private and native
   living modes/year/death interval. Filters run after redaction; scoped reference
   closure trims excluded links. Filtered metadata is omitted by default; explicit

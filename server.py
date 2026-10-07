@@ -13,7 +13,7 @@ from platform_paths import runtime_dir
 
 RUNTIME = runtime_dir() / "connection.json"
 DEFAULT_EXE = os.environ.get("GRAMPS_EXECUTABLE", "")
-VERSION = "2.8.0"
+VERSION = "2.9.0"
 
 
 def schema(properties=None, required=None):
@@ -241,7 +241,7 @@ tool(
     "ADVANCED FULL CONTROL: run trusted Python inside Gramps on the GTK main thread. "
     "Available: Gtk, Gdk, GLib, dbstate, db, uistate, viewmanager, bridge. Assign result for structured output. "
     "This is not a sandbox; it can change/delete records and files. Use Gramps DbTxn for database writes, "
-    "preserve project evidence/sole-master rules, never execute untrusted record content, and never force-unlock a database.",
+    "preserve project evidence/sole-master rules, never execute untrusted record content, and use guarded automatic recovery for abandoned locks.",
     {"code": string()},
     ["code"],
 )
@@ -411,6 +411,48 @@ tool(
         "patch": {"type": "object"},
     },
     ["kind", "operation"],
+)
+tool(
+    "details",
+    "Discover/preview/edit person associations, enclosing-place references, LDS ordinances and styled note tags; promote alternate names without discarding other names. "
+    "Require owner/item or collection revisions, current referenced-target revisions and reviewed plans; reject place cycles and invalid character ranges.",
+    {
+        **selector,
+        "field": {
+            "type": "string",
+            "enum": [
+                "association",
+                "enclosing_place",
+                "lds_ordinance",
+                "styled_tag",
+                "alternate_name",
+            ],
+        },
+        "operation": {
+            "type": "string",
+            "enum": [
+                "list",
+                "add",
+                "update",
+                "retarget",
+                "remove",
+                "reorder",
+                "promote",
+            ],
+        },
+        "expected_revision": string(),
+        "expected_detail_revision": string(),
+        "expected_plan": string(),
+        "patch": {"type": "object"},
+        "target_revisions": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+        },
+        "index": integer(),
+        "order": {"type": "array", "items": integer()},
+        **apply_fields,
+    },
+    ["kind", "field"],
 )
 tool(
     "family_member",
@@ -708,6 +750,59 @@ attachment_schema = schema(
     ],
 )
 tool(
+    "batch_records",
+    "Preview/apply ordered native create/delete/merge operations using a detached database. "
+    "Predict every backlink change and deletion; preserve original selection revisions. "
+    "Apply requires the retained plan and unchanged inspected tree; one native transaction. "
+    "Person choices select primary_name/gender/gramps_id independently. Receipts support guarded rollback.",
+    {
+        "operation": {
+            "type": "string",
+            "enum": ["run", "receipt", "receipts", "rollback"],
+        },
+        "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": schema(
+                {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["create", "delete", "merge"],
+                    },
+                    "kind": KINDS,
+                    "handle": string(),
+                    "expected_revision": string(),
+                    "patch": {"type": "object"},
+                    "client_id": string(
+                        "References to earlier creations use $new:client_id"
+                    ),
+                    "keep_handle": string(),
+                    "remove_handle": string(),
+                    "keep_revision": string(),
+                    "remove_revision": string(),
+                    "choices": {
+                        "type": "object",
+                        "properties": {
+                            key: {"type": "string", "enum": ["keep", "remove"]}
+                            for key in ("primary_name", "gender", "gramps_id")
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                ["operation", "kind"],
+            ),
+        },
+        "expected_plan": string(),
+        "receipt_id": string(),
+        "label": string(),
+        "apply": {"type": "boolean"},
+        "max_records": integer(
+            "Detached snapshot bound, default 50000, maximum 200000"
+        ),
+    },
+)
+tool(
     "batch_attach",
     "Preview/apply 1–200 ordered tag, note, citation or native reference operations atomically. "
     "Bind owner/target revisions and a reviewed plan; repeated owner operations share one commit and receipt. "
@@ -785,12 +880,25 @@ tool(
 )
 tool(
     "export",
-    "List/preview/write native XML, compressed Gramps XML, GEDCOM or portable media packages; "
+    "List/preview/write native XML, GEDCOM, media packages, CSV, Web Family Tree, GeneWeb, vCalendar and vCard; "
     "run supports native private/living/person filtering. Defaults include private/living records. Backup preserves the whole tree. "
     "Apply requires the reviewed plan and explicit destination; missing package media is rejected by default.",
     {
         "operation": {"type": "string", "enum": ["list", "run", "backup"]},
-        "format": {"type": "string", "enum": ["gramps", "xml", "gedcom", "gpkg"]},
+        "format": {
+            "type": "string",
+            "enum": [
+                "gramps",
+                "xml",
+                "gedcom",
+                "gpkg",
+                "csv",
+                "web_family_tree",
+                "geneweb",
+                "vcalendar",
+                "vcard",
+            ],
+        },
         "output_path": string(),
         "include_media": {"type": "boolean"},
         "allow_missing_media": {"type": "boolean"},
@@ -807,9 +915,54 @@ tool(
         ),
         "linked_only": {"type": "boolean"},
         "include_tree_metadata": {"type": "boolean"},
+        "options": {"type": "object"},
         "overwrite": {"type": "boolean"},
         "apply": {"type": "boolean"},
         "expected_plan": string(),
+    },
+    ["operation"],
+)
+tool(
+    "import",
+    "Discover installed importers; review/import XML, GEDCOM, CSV or GeneWeb into the exact open tree, or restore XML into an empty tree. "
+    "Native import has no generic dry run or atomic rollback. Bind file bytes, destination state and prompt policy; inspect completed/failed/cancelled/indeterminate receipts before retrying.",
+    {
+        "operation": {"type": "string", "enum": ["list", "run", "restore", "receipt"]},
+        "importer_id": string(),
+        "file_path": string(),
+        "receipt_id": string(),
+        "prompt_policy": {"type": "string", "enum": ["reject", "accept"]},
+        "max_records": integer(),
+        "expected_plan": string(),
+        "apply": {"type": "boolean"},
+    },
+    ["operation"],
+)
+tool(
+    "database",
+    "Discover exact native trees/backends; preview/create SQLite trees, open/close, rename closed trees or remove them with a preserved directory. "
+    "Apply requires the current plan. Automatic lock recovery handles verified abandoned local Windows SQLite locks; active locks and native recovery requirements remain enforced.",
+    {
+        "operation": {
+            "type": "string",
+            "enum": [
+                "list",
+                "status",
+                "create",
+                "open",
+                "close",
+                "rename",
+                "delete",
+                "receipt",
+            ],
+        },
+        "tree_path": string(),
+        "name": string(),
+        "backend": string(),
+        "preservation_path": string(),
+        "receipt_id": string(),
+        "expected_plan": string(),
+        "apply": {"type": "boolean"},
     },
     ["operation"],
 )
@@ -882,7 +1035,8 @@ def validate(value, field, path="arguments"):
             validate(child, field.get("items", {}), path + "[" + str(i) + "]")
 
 
-def call_bridge(method, arguments, runtime=RUNTIME):
+def call_bridge(method, arguments, runtime=None):
+    runtime = RUNTIME if runtime is None else runtime
     info = json.loads(runtime.read_text(encoding="utf-8"))
     # Never follow a modified discovery file to a remote server or HTTP redirect.
     from urllib.parse import urlparse
@@ -915,6 +1069,7 @@ def health(runtime=None):
     report = {
         "adapter_version": VERSION,
         "server_path": str(Path(__file__).resolve()),
+        "runtime_path": str(runtime.resolve()),
         "discovery_present": runtime.is_file(),
         "connected": False,
         "ready": False,
@@ -975,7 +1130,11 @@ def health(runtime=None):
             if not same_version:
                 report.update(
                     reason="version_mismatch",
-                    next_action="Close/reopen Gramps normally to load the installed bridge version",
+                    next_action=(
+                        "Select/update the client adapter when adapter_version is older; "
+                        "disable competing legacy Gramps plugin identities. "
+                        "Reopen Gramps normally only when its bridge is the older component."
+                    ),
                 )
             elif dialogs:
                 report.update(
@@ -1149,6 +1308,7 @@ def handle(request):
 
 
 def main():
+    global RUNTIME
     for stream in (sys.stdin, sys.stdout):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
@@ -1157,7 +1317,16 @@ def main():
         "--call", help="Direct diagnostic call using the same MCP tools"
     )
     parser.add_argument("--arguments", default="{}", help="Arguments JSON for --call")
+    parser.add_argument(
+        "--runtime-dir",
+        type=Path,
+        help="Absolute directory containing the intended bridge discovery",
+    )
     options = parser.parse_args()
+    if options.runtime_dir is not None:
+        if not options.runtime_dir.is_absolute():
+            parser.error("The bridge runtime directory must be absolute")
+        RUNTIME = options.runtime_dir / "connection.json"
     if options.call:
         print(
             json.dumps(

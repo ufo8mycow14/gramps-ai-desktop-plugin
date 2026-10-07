@@ -3,6 +3,7 @@ param(
     [string]$Python = '',
     [string]$Project = $PSScriptRoot,
     [string]$AddonDirectory = '',
+    [string]$RuntimeDirectory = '',
     [switch]$Standalone,
     [switch]$DryRun
 )
@@ -25,6 +26,7 @@ $installationArgs = @((Join-Path $PSScriptRoot 'install.py'), '--project', $Proj
 if ($Standalone) { $installationArgs += '--standalone' }
 if ($DryRun) { $installationArgs += '--dry-run' }
 if ($AddonDirectory) { $installationArgs += @('--addon-dir', $AddonDirectory) }
+if ($RuntimeDirectory) { $installationArgs += @('--runtime-dir', $RuntimeDirectory) }
 & $Python @installationArgs
 if ($LASTEXITCODE -ne 0) { throw 'Gramps Desktop plugin installation failed.' }
 Write-Output 'Keep this checkout in place. Reconnect client tools after installation; save work before reopening Gramps.'

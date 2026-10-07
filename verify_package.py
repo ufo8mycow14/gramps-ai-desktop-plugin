@@ -40,6 +40,11 @@ def main():
         "report_output.py",
         "report_media.py",
         "native_exports.py",
+        "native_imports.py",
+        "database_support.py",
+        "native_batch.py",
+        "special_details.py",
+        "lock_support.py",
         "web_support.py",
         "platform_paths.py",
         "install.py",
@@ -47,6 +52,14 @@ def main():
         "verify_integrations.py",
         "verify_expansion.py",
         "test/detail_lifecycle_test.py",
+        "test/installer_test.py",
+        "test/lock_recovery_test.py",
+        "test/native_lock_opening_test.py",
+        "test/native_batch_test.py",
+        "test/native_imports_test.py",
+        "test/database_lifecycle_test.py",
+        "test/native_exports_test.py",
+        "test/special_details_test.py",
     ):
         compile((root / name).read_text(encoding="utf-8"), name, "exec")
     checks.append("source_compiles")
@@ -119,6 +132,36 @@ def main():
             tomllib.loads(restored) == tomllib.loads(plugin) and unrelated in restored
         )
     checks.append("commented_toml_headers_transitions_preservation_and_idempotence")
+    mixed = unrelated + "".join(
+        "[plugins." + json.dumps(identity) + "] # known identity\nenabled = true\n"
+        for identity in configure.KNOWN_PLUGINS
+    )
+    migrated = configure.configure_text(
+        mixed, False, Path("python"), Path("server.py"), plugin_id
+    )
+    migrated_config = tomllib.loads(migrated)
+    assert unrelated in migrated and migrated_config["plugins"][plugin_id]["enabled"]
+    assert (
+        sum(
+            bool(migrated_config["plugins"][identity]["enabled"])
+            for identity in configure.KNOWN_PLUGINS
+        )
+        == 1
+    )
+    assert (
+        configure.configure_text(
+            migrated, False, Path("python"), Path("server.py"), plugin_id
+        )
+        == migrated
+    )
+    standalone = configure.configure_text(
+        mixed, True, Path("python"), Path("server.py"), plugin_id
+    )
+    assert not any(
+        tomllib.loads(standalone)["plugins"][identity]["enabled"]
+        for identity in configure.KNOWN_PLUGINS
+    )
+    checks.append("mixed_marketplace_identity_migration_and_single_transport")
     requests = [
         {
             "jsonrpc": "2.0",
@@ -149,13 +192,13 @@ def main():
     assert replies[2]["error"]["code"] == -32600
     assert replies[3]["id"] == 3 and replies[3]["result"] == {}
     tools = replies[4]["result"]["tools"]
-    assert len(tools) == 54 and len({t["name"] for t in tools}) == 54
+    assert len(tools) == 58 and len({t["name"] for t in tools}) == 58
     assert any("1–200" in tool["description"] for tool in tools)
     checks.append("utf8_stdio_under_windows_legacy_encoding")
     readme = (root / "README.md").read_text(encoding="utf-8")
     assert all("`" + tool["name"] + "`" in readme for tool in tools)
     assert "GNU GENERAL PUBLIC LICENSE" in (root / "LICENSE").read_text()
-    checks.append("malformed_request_error_then_ping_and_54_documented_tools")
+    checks.append("malformed_request_error_then_ping_and_58_documented_tools")
     print(
         json.dumps(
             {"passed": len(checks), "checks": checks, "family_data_access": False}

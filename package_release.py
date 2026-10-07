@@ -32,6 +32,11 @@ FILES = (
     "report_output.py",
     "report_media.py",
     "native_exports.py",
+    "native_imports.py",
+    "database_support.py",
+    "native_batch.py",
+    "special_details.py",
+    "lock_support.py",
     "web_support.py",
     "platform_paths.py",
     "install.py",
@@ -47,6 +52,14 @@ FILES = (
     "verify_menu_support.py",
     "package_release.py",
     "test/detail_lifecycle_test.py",
+    "test/installer_test.py",
+    "test/lock_recovery_test.py",
+    "test/native_lock_opening_test.py",
+    "test/native_batch_test.py",
+    "test/native_imports_test.py",
+    "test/database_lifecycle_test.py",
+    "test/native_exports_test.py",
+    "test/special_details_test.py",
 )
 
 

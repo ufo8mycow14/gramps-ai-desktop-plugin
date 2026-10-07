@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.9.0 — 8 October 2026
+
+- Recover verified abandoned local Windows SQLite locks automatically on native
+  selected-tree/autoload opening; reuse the shared open tree and retain active
+  or uncertain locks. Preserve native close/upgrade handling and release guards
+  after cancellation/failure; install all hooks before native autoload.
+- Refresh opening hooks when their source changes, even within one bridge
+  session; preserve outstanding guards until native opening completes. Close
+  plugin-owned SQLite connections and recover abandoned markers after an early
+  tree-creation failure.
+- Add reviewed native record create/delete/merge batches with detached previews,
+  original revisions, native ID allocation, backlink cleanup, independent person
+  choices, transitive/implicit merge mappings and guarded receipt rollback.
+- Add XML/GEDCOM/CSV/GeneWeb import plans and empty-tree XML restoration, binding
+  input bytes, destination and prompt policy. Preserve honest partial/unknown
+  receipts, warnings and native state restoration; imports are not atomic.
+- Add exact-path SQLite tree creation/open/close, closed-tree rename and removal
+  into an explicit preservation directory, with native outcome receipts.
+- Add specialised person/place/LDS/styled-note details and alternate-name
+  promotion; add five lossy native export formats and CSV option/cycle guards.
+- Migrate known plugin identities and compensate interrupted local installer
+  writes; support an explicit shared discovery directory. Expand to 58 tools.
+- Stage interpreter/discovery settings before Codex caches the plugin; restore
+  owned files after registration failure and preserve concurrent transport edits.
+
 ## 2.8.0 — 8 October 2026
 
 - Expand the existing secondary tool with typed collection discovery and

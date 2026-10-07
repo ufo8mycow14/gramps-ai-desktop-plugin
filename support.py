@@ -10,7 +10,7 @@ from gramps.gen import lib
 from gramps.gen.db import DbTxn
 from gramps.gen.lib.json_utils import object_to_dict, data_to_object
 
-VERSION = "2.8.0"
+VERSION = "2.9.0"
 
 KINDS = {
     "person": "Person",
@@ -56,6 +56,10 @@ METHODS = {
     "batch",
     "batch_attach",
     "batch_file",
+    "batch_records",
+    "details",
+    "import",
+    "database",
     "media_manage",
     "sync_apply",
     "sync_refs",
@@ -242,6 +246,52 @@ class GrampsSupport:
         return {"applied": True, "before": before, "after": saved, "undo_label": label}
 
     def dispatch(self, method, a):
+        if method == "database":
+            if not hasattr(self, "databases"):
+                from importlib.util import spec_from_file_location, module_from_spec
+
+                spec = spec_from_file_location(
+                    "gramps_native_databases",
+                    Path(__file__).with_name("database_support.py"),
+                )
+                module = module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.databases = module.DatabaseSupport(self, revision)
+            return self.databases.dispatch(a)
+        if method == "import":
+            if not hasattr(self, "imports"):
+                from importlib.util import spec_from_file_location, module_from_spec
+
+                spec = spec_from_file_location(
+                    "gramps_native_imports",
+                    Path(__file__).with_name("native_imports.py"),
+                )
+                module = module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.imports = module.NativeImports(self, revision)
+            return self.imports.dispatch(a)
+        if method == "details":
+            from importlib.util import spec_from_file_location, module_from_spec
+
+            spec = spec_from_file_location(
+                "gramps_special_details", Path(__file__).with_name("special_details.py")
+            )
+            module = module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module.dispatch(self, a, decode, merge_patch, revision)
+        if method == "batch_records":
+            if not hasattr(self, "record_batches"):
+                from importlib.util import spec_from_file_location, module_from_spec
+
+                spec = spec_from_file_location(
+                    "gramps_native_batch", Path(__file__).with_name("native_batch.py")
+                )
+                module = module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.record_batches = module.NativeBatch(
+                    self, decode, merge_patch, revision
+                )
+            return self.record_batches.dispatch(a)
         if method in (
             "secondary",
             "schema",
@@ -345,9 +395,15 @@ class GrampsSupport:
                 "kinds": KINDS,
                 "structured_methods": sorted(METHODS),
                 "integrations": [
+                    "automatic_abandoned_lock_recovery",
+                    "native_batch_record_lifecycle",
+                    "reviewed_native_import_restore",
+                    "reviewed_database_lifecycle",
+                    "specialised_reference_details",
                     "native_filters",
                     "native_reports",
                     "atomic_batch_updates",
+                    "reviewed_native_lifecycle_batches",
                     "atomic_batch_attachments",
                     "saved_batch_plans_receipts",
                     "native_exports_backups",

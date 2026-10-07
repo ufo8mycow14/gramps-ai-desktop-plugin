@@ -10,17 +10,21 @@ import secrets
 import threading
 import time
 import uuid
+from typing import Any
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from gi.repository import Gtk, Gdk, GLib
 
 MAX_BODY = 1024 * 1024
-VERSION = "2.8.0"
+VERSION = "2.9.0"
 INSTANCE = None
 
 
 class DesktopBridge:
-    def __init__(self, dbstate, uistate):
+    def __init__(
+        self, dbstate: Any, uistate: Any, runtime: Path | str | None = None
+    ) -> None:
+        """Share native state and publish discovery in the selected directory."""
         self.dbstate, self.uistate = dbstate, uistate
         self.session = uuid.uuid4().hex
         self.token = secrets.token_urlsafe(48)
@@ -31,6 +35,7 @@ class DesktopBridge:
         self.jobs = {}
         self.lock = threading.RLock()
         self.started = time.time()
+        self.lock_recovery = None
         from importlib.util import spec_from_file_location, module_from_spec
 
         paths_spec = spec_from_file_location(
@@ -38,7 +43,15 @@ class DesktopBridge:
         )
         paths = module_from_spec(paths_spec)
         paths_spec.loader.exec_module(paths)
-        self.runtime = paths.runtime_dir()
+        recovery_spec = spec_from_file_location(
+            "gramps_desktop_locks", Path(__file__).with_name("lock_support.py")
+        )
+        recovery = module_from_spec(recovery_spec)
+        recovery_spec.loader.exec_module(recovery)
+        recovery.install(self)
+        self.runtime = Path(runtime) if runtime is not None else paths.runtime_dir()
+        if not self.runtime.is_absolute():
+            raise ValueError("The bridge runtime directory must be absolute")
         self.runtime.mkdir(parents=True, exist_ok=True, mode=0o700)
         if os.name != "nt":
             self.runtime.chmod(0o700)
@@ -326,6 +339,10 @@ class DesktopBridge:
             "batch",
             "batch_attach",
             "batch_file",
+            "batch_records",
+            "details",
+            "import",
+            "database",
             "media_manage",
             "sync_apply",
             "sync_refs",
@@ -354,6 +371,7 @@ class DesktopBridge:
                 "database_open": opened,
                 "database_name": db.get_dbname() if opened else None,
                 "database_readonly": db.readonly if opened else None,
+                "lock_recovery": self.lock_recovery,
                 "ui_initialised": bool(
                     getattr(self.uistate.viewmanager, "active_page", None)
                 ),
@@ -727,8 +745,11 @@ class DesktopBridge:
         raise ValueError("Unknown command: " + method)
 
 
-def start(dbstate, uistate):
+def start(
+    dbstate: Any, uistate: Any, runtime: Path | str | None = None
+) -> DesktopBridge | None:
+    """Start the shared bridge once using the configured discovery directory."""
     global INSTANCE
     if uistate is not None and INSTANCE is None:
-        INSTANCE = DesktopBridge(dbstate, uistate)
+        INSTANCE = DesktopBridge(dbstate, uistate, runtime)
     return INSTANCE
