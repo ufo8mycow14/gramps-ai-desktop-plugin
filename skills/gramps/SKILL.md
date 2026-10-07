@@ -22,6 +22,11 @@ Choose the relevant route:
   within existing task authority. Use `family_member` for reciprocal family links.
   Preserve evidence/conflicts and identifiers. Finish native dialogs first.
   Re-read after a change; stale revisions must fail rather than overwrite edits.
+- Bulk editing: use `batch` for 1–200 existing-record updates. Read current
+  revisions, preview every patch, then apply with `expected_plan`. Retain full
+  before/after snapshots and `receipt_id`. Rollback is previewed separately and
+  requires every affected record to retain its saved revision in this session.
+  Use `family_member` for reciprocal family relationships.
 - Native application: inspect `windows`, `widgets`, `menus`, `cells`, `actions`, `views`, `rows` and `selection`
   before operating observed IDs/actions. `editor` opens unsaved or existing native
   editing screens; Save/OK commits through Gramps. Cancel temporary test dialogs.

@@ -8,7 +8,7 @@ import zipfile
 FILES = (
     'README.md', 'LICENSE', 'CHANGELOG.md', '.gitignore',
     '.codex-plugin/plugin.json', '.agents/plugins/marketplace.json',
-    'skills/gramps/SKILL.md', 'server.py', 'desktop_bridge.py', 'support.py', 'ui_support.py',
+    'skills/gramps/SKILL.md', 'server.py', 'desktop_bridge.py', 'support.py', 'ui_support.py', 'batch_support.py', 'verify_batch.py',
     'DesktopControl.py', 'DesktopControl.gpr.py', 'configure.py', 'install.ps1',
     'verify_package.py', 'verify_support.py', 'verify_menu_support.py', 'package_release.py',
 )

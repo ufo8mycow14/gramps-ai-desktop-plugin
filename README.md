@@ -5,7 +5,7 @@ its windows, menus, native editors and already-open family tree. I package it as
 a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
 MCP supplies the tool transport and standalone-client integration.
 
-**Release: 2.2.1 · 39 tools · GPL-2.0-or-later**
+**Release: 2.3.0 · 40 tools · GPL-2.0-or-later**
 
 [Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
 · [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
@@ -23,6 +23,7 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. Gramps 6.0, Linux and macOS are not verified
 | Navigation and controls | Switch native views; inspect/edit table cells and combo cells; read/set selections; notebook pages; text, toggles, numbers, dates, colours, fonts and file/folder choices | Uses native editor callbacks and control bounds; individual add-on interfaces can differ |
 | Native editing screens | Open existing or unsaved people, families, events, places, sources, citations, repositories, media, notes and tags | Uses normal Gramps editors and their Save/Cancel controls |
 | Structured records | Read schemas and named fields; search by text/field filters; create, update and delete native records | Ten record kinds, including tags; preview by default and revision checks for existing records |
+| Bulk editing | Preview/apply existing-record batches with exact before/after receipts and guarded rollback | 1–200 updates in one transaction; current revisions and preview plan required |
 | Relationships | Read parents, partners and children; add/remove parent and child memberships | Reciprocal person/family updates in a transaction; ancestry-cycle checks |
 | References | Read outgoing links/backlinks; attach/detach citations, notes, tags, events, media, repository references and citation sources | Supported combinations follow native record schemas |
 | Merging | Compare records and preview/apply native merges | Nine record kinds; both current revisions required for apply; tags are excluded |
@@ -194,13 +195,42 @@ Some Gramps tools process data, write files or contact services immediately in
 their constructor. Inspect a tool's purpose and apply the current task's authority
 before launching it; there is no universal safe options screen.
 
-## All 39 tools
+### Reviewable bulk editing
+
+I added `gramps_batch` for **1–200 existing-record updates in one native Gramps
+transaction**. All ten record kinds are supported. Each update supplies `kind`,
+`handle`, `expected_revision` and a named-field `patch`.
+
+1. Read each target with `gramps_object` to obtain its current revision.
+2. Call `gramps_batch` with `changes` and `apply: false` to inspect the complete
+   `before` and `proposed` records and returned `plan_revision`.
+3. Apply that same batch with `apply: true` and `expected_plan` set to the preview's
+   `plan_revision`. Missing/stale revisions or a changed preview reject the batch.
+4. Keep the returned `receipt_id`, full `before`/`after` snapshots and undo label.
+   The receipt describes what was actually saved.
+
+For rollback, call `gramps_batch` with `operation: "rollback"` and the receipt ID
+to preview restoration. Apply using that rollback preview's `expected_plan`.
+Rollback requires every affected record to retain its saved revision; later edits
+are preserved by rejecting a stale receipt. Receipts are retained for the current
+Gramps session, with the latest 100 available for rollback.
+
+Bulk patches preserve record identifiers and change timestamps. Reciprocal family
+relationships use `gramps_family_member`. Native Save/OK edits and bulk updates
+share Gramps' database history. I reject bulk writes while native dialogs are open.
+
+I verified **18 isolated bulk-edit checks** using a synthetic SQLite `:memory:`
+database, including mixed-record updates, zero-write previews, stale/invalid batch
+rejection, injected transaction failure with complete rollback, saved change
+receipts and guarded restoration. No live family records were changed.
+
+## All 40 tools
 
 | Group | Tools |
 | --- | --- |
 | Connection | `gramps_launch`, `gramps_status`, `gramps_health`, `gramps_capabilities` |
 | Desktop | `gramps_windows`, `gramps_widgets`, `gramps_widget`, `gramps_menus`, `gramps_menu`, `gramps_cells`, `gramps_actions`, `gramps_action`, `gramps_views`, `gramps_view`, `gramps_rows`, `gramps_selection`, `gramps_editor`, `gramps_screenshot`, `gramps_job`, `gramps_python` |
-| Records | `gramps_records`, `gramps_record`, `gramps_schema`, `gramps_object`, `gramps_find`, `gramps_mutate` |
+| Records | `gramps_records`, `gramps_record`, `gramps_schema`, `gramps_object`, `gramps_find`, `gramps_mutate`, `gramps_batch` |
 | Relationships and references | `gramps_relatives`, `gramps_links`, `gramps_family_member`, `gramps_attach` |
 | Merges | `gramps_compare`, `gramps_merge` |
 | Context | `gramps_media_info`, `gramps_research`, `gramps_date` |
@@ -229,7 +259,7 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.2.1**, with **39 tools**.
+The plugin package and adapter/bridge API are **2.3.0**, with **40 tools**.
 
 | Check | Verified result |
 | --- | --- |
@@ -239,7 +269,8 @@ The plugin package and adapter/bridge API are **2.2.1**, with **39 tools**.
 | Expanded native GTK controls | 33 isolated checks covering cell-editor lifecycles, popup scopes, file selection, numeric/calendar/colour/font controls and rejected inputs |
 | Native dialog access | Eight synthetic open/inspect/cancel checks: tag editor; `dupfind`, `eventcmp`, `mediaman`, `editowner`; `ancestor_report`, `descend_report`, `summary` |
 | Installed menu and plugin routing | 155 actionable menu entries, 55 GUI tools and 62 GUI reports resolved in the tested configuration |
-| Current plugin discovery | One enabled desktop server with version 2.2.1 and all 39 tools |
+| Bulk-edit expansion | 18 isolated native checks on synthetic data, including injected transaction failure and guarded rollback |
+| Earlier plugin discovery | Version 2.2.1 exposed all 39 baseline tools; version 2.3.0 adds `gramps_batch` |
 | Portable public package | Four grouped offline checks passed; fresh public installation used matching packaged sources; downloaded release ZIP matched the checked archive |
 
 I exercised structured writes only on synthetic in-memory data. Live editor and

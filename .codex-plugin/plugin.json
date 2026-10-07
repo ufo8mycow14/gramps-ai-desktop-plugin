@@ -1,7 +1,7 @@
 {
   "name": "gramps-desktop",
-  "version": "2.2.1",
-  "description": "Control the installed Gramps desktop and open database.",
+  "version": "2.3.0",
+  "description": "Control Gramps desktop records with reviewable atomic bulk edits and change receipts.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {

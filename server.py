@@ -11,7 +11,7 @@ import urllib.request
 
 RUNTIME = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'GrampsDesktopMCP' / 'connection.json'
 DEFAULT_EXE = os.environ.get('GRAMPS_EXECUTABLE', '')
-VERSION = '2.2.1'
+VERSION = '2.3.0'
 
 
 def schema(properties=None, required=None):
@@ -138,6 +138,15 @@ tool('settings', 'Read keys/preferences or set an explicitly requested preferenc
 tool('rows', 'Read paginated rows/choices from a discovered native GTK TreeView or ComboBox.',
      {'widget_id': string(), 'parent_path': string(), 'limit': integer(), 'offset': integer()}, ['widget_id'], True)
 tool('date', 'Parse and display a genealogical date using the installed Gramps date handler.', {'text': string()}, ['text'], True)
+
+
+change_schema = schema({'kind': KINDS, 'handle': string(), 'expected_revision': string(),
+                        'patch': {'type': 'object'}}, ['kind', 'handle', 'expected_revision', 'patch'])
+tool('batch', 'Preview/apply 1–200 distinct record updates in one native transaction, or preview/perform receipt rollback. '
+     'Apply requires the current preview plan. Rollback requires unchanged saved record revisions in this session.',
+     {'operation': {'type': 'string', 'enum': ['update', 'rollback']},
+      'changes': {'type': 'array', 'items': change_schema}, 'receipt_id': string(),
+      'expected_plan': string(), 'apply': {'type': 'boolean'}, 'label': string()})
 
 
 def validate(value, field, path='arguments'):

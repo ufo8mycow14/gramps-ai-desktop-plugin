@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.3.0 — 7 October 2026
+
+- Add `gramps_batch`, bringing the plugin to 40 tools.
+- Preview 1–200 existing-record updates with complete before/proposed snapshots.
+- Apply each reviewed batch in one native transaction with current revisions and
+  a matching preview plan; preserve identifiers and reciprocal family routes.
+- Return exact before/after change receipts and the native undo label.
+- Preview and apply receipt rollback while rejecting intervening record changes.
+- Pass 18 isolated synthetic checks, including injected transaction failure and
+  complete rollback; no live family records were changed.
+
 ## 2.2.1 — 7 October 2026
 
 - Expand the integration to 39 tools with native menu paths, targets, revisions

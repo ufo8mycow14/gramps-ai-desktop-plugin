@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from gi.repository import Gtk, Gdk, GLib
 
 MAX_BODY = 1024 * 1024
-VERSION = '2.2.1'
+VERSION = '2.3.0'
 INSTANCE = None
 
 
@@ -216,7 +216,7 @@ class DesktopBridge:
             return getattr(self.native_ui, method)(a)
         if method in ('capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
                       'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
-                      'history', 'workflow', 'plugins', 'settings', 'rows', 'date'):
+                      'history', 'workflow', 'plugins', 'settings', 'rows', 'date', 'batch'):
             if not hasattr(self, 'support'):
                 spec = spec_from_file_location('gramps_desktop_support', Path(__file__).with_name('support.py'))
                 module = module_from_spec(spec)

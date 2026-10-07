@@ -14,7 +14,7 @@ KINDS = {'person': 'Person', 'family': 'Family', 'event': 'Event', 'place': 'Pla
          'media': 'Media', 'note': 'Note', 'tag': 'Tag'}
 METHODS = {'capabilities', 'schema', 'object', 'find', 'relatives', 'links', 'mutate',
            'family_member', 'attach', 'compare', 'merge', 'media_info', 'research',
-           'history', 'workflow', 'plugins', 'settings', 'rows', 'date'}
+           'history', 'workflow', 'plugins', 'settings', 'rows', 'date', 'batch'}
 
 
 def revision(data):
@@ -160,8 +160,16 @@ class GrampsSupport:
         return {'applied': True, 'before': before, 'after': saved, 'undo_label': label}
 
     def dispatch(self, method, a):
+        if method == 'batch':
+            if not hasattr(self, 'batches'):
+                from importlib.util import spec_from_file_location, module_from_spec
+                spec = spec_from_file_location('gramps_desktop_batches', Path(__file__).with_name('batch_support.py'))
+                module = module_from_spec(spec)
+                spec.loader.exec_module(module)
+                self.batches = module.BatchSupport(self, decode, merge_patch, revision)
+            return self.batches.batch(a)
         if method == 'capabilities':
-            return {'version': '2.2.1', 'kinds': KINDS, 'structured_methods': sorted(METHODS),
+            return {'version': '2.3.0', 'kinds': KINDS, 'structured_methods': sorted(METHODS),
                     'native_editors': list(KINDS), 'merge_kinds': [k for k in KINDS if k != 'tag'],
                     'writes': 'Native DbTxn with record revisions; preview unless apply=true',
                     'fallback': 'Native GTK controls/actions and privileged gramps_python',
