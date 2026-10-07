@@ -11,7 +11,7 @@ import urllib.request
 
 RUNTIME = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'GrampsDesktopMCP' / 'connection.json'
 DEFAULT_EXE = os.environ.get('GRAMPS_EXECUTABLE', '')
-VERSION = '2.3.0'
+VERSION = '2.3.1'
 
 
 def schema(properties=None, required=None):
@@ -315,6 +315,9 @@ def handle(request):
 
 
 def main():
+    for stream in (sys.stdin, sys.stdout):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8')
     parser = argparse.ArgumentParser()
     parser.add_argument('--call', help='Direct diagnostic call using the same MCP tools')
     parser.add_argument('--arguments', default='{}', help='Arguments JSON for --call')

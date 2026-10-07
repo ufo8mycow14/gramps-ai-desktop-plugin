@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from gi.repository import Gtk, Gdk, GLib
 
 MAX_BODY = 1024 * 1024
-VERSION = '2.3.0'
+VERSION = '2.3.1'
 INSTANCE = None
 
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.1 — 7 October 2026
+
+- Set the MCP stdio protocol to UTF-8 explicitly on Windows, preserving Unicode
+  tool descriptions and genealogy record text. Bulk-edit behaviour is unchanged.
+
 ## 2.3.0 — 7 October 2026
 
 - Add `gramps_batch`, bringing the plugin to 40 tools.

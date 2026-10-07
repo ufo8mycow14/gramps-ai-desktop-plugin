@@ -169,7 +169,7 @@ class GrampsSupport:
                 self.batches = module.BatchSupport(self, decode, merge_patch, revision)
             return self.batches.batch(a)
         if method == 'capabilities':
-            return {'version': '2.3.0', 'kinds': KINDS, 'structured_methods': sorted(METHODS),
+            return {'version': '2.3.1', 'kinds': KINDS, 'structured_methods': sorted(METHODS),
                     'native_editors': list(KINDS), 'merge_kinds': [k for k in KINDS if k != 'tag'],
                     'writes': 'Native DbTxn with record revisions; preview unless apply=true',
                     'fallback': 'Native GTK controls/actions and privileged gramps_python',

@@ -5,7 +5,7 @@ its windows, menus, native editors and already-open family tree. I package it as
 a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
 MCP supplies the tool transport and standalone-client integration.
 
-**Release: 2.3.0 · 40 tools · GPL-2.0-or-later**
+**Release: 2.3.1 · 40 tools · GPL-2.0-or-later**
 
 [Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
 · [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
@@ -259,7 +259,7 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.3.0**, with **40 tools**.
+The plugin package and adapter/bridge API are **2.3.1**, with **40 tools**.
 
 | Check | Verified result |
 | --- | --- |
@@ -270,7 +270,7 @@ The plugin package and adapter/bridge API are **2.3.0**, with **40 tools**.
 | Native dialog access | Eight synthetic open/inspect/cancel checks: tag editor; `dupfind`, `eventcmp`, `mediaman`, `editowner`; `ancestor_report`, `descend_report`, `summary` |
 | Installed menu and plugin routing | 155 actionable menu entries, 55 GUI tools and 62 GUI reports resolved in the tested configuration |
 | Bulk-edit expansion | 18 isolated native checks on synthetic data, including injected transaction failure and guarded rollback |
-| Earlier plugin discovery | Version 2.2.1 exposed all 39 baseline tools; version 2.3.0 adds `gramps_batch` |
+| Earlier plugin discovery | Version 2.2.1 exposed all 39 baseline tools; version 2.3.1 adds `gramps_batch` |
 | Portable public package | Four grouped offline checks passed; fresh public installation used matching packaged sources; downloaded release ZIP matched the checked archive |
 
 I exercised structured writes only on synthetic in-memory data. Live editor and
