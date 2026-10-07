@@ -1,6 +1,6 @@
 {
   "name": "gramps-desktop",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "Control Gramps desktop records, graphs, metadata, Gramplets, filters, privacy exports, reports and configured Gramps Web.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",

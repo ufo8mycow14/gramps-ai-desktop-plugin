@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.8.0 — 8 October 2026
+
+- Expand the existing secondary tool with typed collection discovery and
+  revision-bound add/remove/reorder for names, surnames, addresses, attributes,
+  URLs and alternate place names/locations, including nested reference attributes.
+- Preserve native blank dates and surname placeholders; reject invalid date
+  metadata, injected attachments, wrong classes and stale item/array revisions.
+- Add Gregorian/Julian month/year offsets with explicit reject/clamp semantics,
+  final-target arithmetic and BCE transitions without year zero.
+- Add Dashboard Gramplet instances, columns, movement, collapse, close and
+  session restore; derive visible positions after native closes and clean up
+  native callbacks/idle resources when content construction fails.
+- Keep all 54 tool identities compatible. Verify 232 isolated native checks,
+  including 15 new unittest flows, plus package and installation checks.
+
 ## 2.7.0 — 7 October 2026
 
 - Add graph, audit, tree metadata, embedded record, navigation and Gramplet tools,

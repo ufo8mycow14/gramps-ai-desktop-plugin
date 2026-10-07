@@ -23,9 +23,16 @@ Choose the relevant route:
   paths/revisions; preview/apply metadata with current owner and secondary
   revisions. Its attach operation requires target revision; preserve identities,
   citations and event indexes. Wrong classes/date shapes must be rejected.
+  collections discovers typed arrays/templates/revisions; add/reorder require
+  the array revision, remove requires the selected item revision. Use exact
+  paths, preview first and apply only with record-write authority. Reference
+  arrays and styled text retain dedicated operations.
 - Dates: `date` options/format/compare are detached and preserve UI formatting.
   Calendar/day offsets require exact full dates with January-1 new year and no
   slash year. Native interval matches are conventions, never historical proof.
+  Gregorian/Julian years/months are combined into one target with explicit
+  nonexistent_day reject/clamp policy; do not mix them with days. BCE has no
+  year zero. Other calendars retain day offsets/calendar conversion.
 - Recorded graphs/audits: `graph` retains parent families/link types, bounds
   nodes/edges/depth/inspections and reports incomplete searches. `audit` uses
   explicit records/candidate pools; inspect matched/different/missing fields.
@@ -123,8 +130,12 @@ Choose the relevant route:
 - Navigation/Gramplets: navigation uses verified handles/IDs and native history
   in observed groups. gramplets lists compatible IDs on sidebar/bottombar; use
   expected_revision for add/remove/select. Adding executes installed code's
-  lifecycle. Individual third-party behaviour remains unverified; Dashboard uses
-  native UI controls.
+  lifecycle. location=dashboard lists unique instance_id values; add permits
+  multiple instances. move/state/remove/restore target an instance; columns
+  accepts 1–10. Use actual returned rows and a fresh revision after each change.
+  Restore covers instances closed this session. Persisted closed entries and
+  detached windows use native controls. Individual third-party side effects
+  remain unverified; layouts are profile state without record undo.
   Report/tool IDs are normalised to native action names automatically. Some tools
   write/process data or contact services inside their constructor; there is no
   universal cancellable options screen. Read the tool's purpose before activation.

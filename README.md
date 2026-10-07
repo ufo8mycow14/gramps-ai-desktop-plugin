@@ -5,7 +5,7 @@ its windows, menus, native editors and already-open family tree. I package it as
 a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
 MCP supplies the tool transport and standalone-client integration.
 
-**Release: 2.7.0 · 54 tools · GPL-2.0-or-later**
+**Release: 2.8.0 · 54 tools · GPL-2.0-or-later**
 
 [Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
 · [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
@@ -23,7 +23,7 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. I provide installation targets for Gramps
 | Windows and menus | Discover full native menu paths, targets, action scopes and enabled states; activate current menu paths and buttons; capture window screenshots | Covers main menus, GTK context menus and widget-local popups; stale menu revisions are rejected |
 | Navigation and controls | Switch native views; inspect/edit table cells and combo cells; read/set selections; notebook pages; text, toggles, numbers, dates, colours, fonts and file/folder choices | Uses native editor callbacks and control bounds; individual add-on interfaces can differ |
 | Native editing screens | Open existing or unsaved people, families, events, places, sources, citations, repositories, media, notes and tags | Uses normal Gramps editors and their Save/Cancel controls |
-| Structured records | Read recursive schemas, native type codes/custom choices and named fields; search, create/update/delete; precisely edit embedded objects | Ten record kinds; embedded paths, owner/secondary revisions, native schema and reload checks |
+| Structured records | Read recursive schemas, type choices and named fields; search, create/update/delete; edit embedded objects; add/remove/reorder typed record details | Ten record kinds; exact paths, owner/item/collection revisions, native schema and reload checks |
 | Bulk editing | Preview/apply record patches and ordered tag/reference attachments; list/export receipts and save plans | 1–200 operations in one transaction; owner/target revisions and reviewed plans; tree-bound rollback |
 | Custom filters | Discover native rules; build/run definitions; preview/save/delete named filters | Nine namespaces; profile-wide XML store with revision checks and backups; tags use record search |
 | Report automation | Native text, drawing, Graphviz, LaTeX and tree-source output; layout/style/CSS and generator options; companion bundles | Source image hashes and isolated derived assets; automatic tree PDF compilation restricted |
@@ -33,10 +33,10 @@ AIO64-6.1.0-beta2-1, GTK 3.24.52**. I provide installation targets for Gramps
 | Relationships | Read parents, partners and children; add/remove parent and child memberships | Reciprocal person/family updates in a transaction; ancestry-cycle checks |
 | Graph and record inspection | Recorded ancestors/descendants, common ancestors, shortest recorded paths, scoped reference checks and duplicate candidates | Explicit limits and truncation; no repair, merge or historical identity inference |
 | Tree metadata | Ordered bookmarks, home person and researcher details | Previewed metadata changes, session/tree-bound receipts and guarded rollback |
-| Record navigation and Gramplets | Activate records by handle/ID, inspect native history, back/forward; sidebar/bottombar inventory/add/remove/select | Observed navigation groups, compatible Gramplet IDs and current layout revisions |
+| Record navigation and Gramplets | Activate records, inspect history, back/forward; sidebar/bottombar controls; Dashboard instances, columns, positioning, collapse and restore | Observed groups, compatible IDs, unique Dashboard instance IDs and current layout revisions |
 | References | Read outgoing links/backlinks; attach/detach citations, notes, tags, events, media, repository references and citation sources | Supported combinations follow native record schemas |
 | Merging | Compare records and preview/apply native merges | Nine record kinds; both current revisions required for apply; tags are excluded |
-| Research context | Read scoped records/citations/sources; resolve media; parse/format/compare dates, convert calendars and offset days | Detached dates; transformations reject incomplete, qualified or ambiguous dates |
+| Research context | Read scoped records/citations/sources; resolve media; parse/format/compare dates, convert calendars and offset days/months/years | Detached dates; Gregorian/Julian month/year arithmetic with explicit reject/clamp policy |
 | History | Read undo/redo history and perform native undo/redo | Shares the desktop application's history, including manual edits |
 | Workflows | Open import, export, backup, tree manager, history, preferences, add-on, report and tool dialogs | Final actions use the native dialogs; dependencies and file/service access still apply |
 | Preferences and add-ons | Discover every native registry category, dependencies/load failures/visibility; preview hide/unhide; read defaults and reviewed preference batches | Profile-wide changes with native callbacks; guarded preference rollback; no dependency installation |
@@ -416,19 +416,50 @@ dates are normalised and the owner must reload through its native class.
 direct attachment-list replacements are rejected. Reciprocal memberships and
 event targets still use the dedicated relationship/attachment tools.
 
+I added `collections` to discover supported detail arrays, their item classes,
+templates and current collection revisions. `add` supplies that array `path`,
+an optional zero-based insertion `index` and a named `patch`. `reorder` supplies
+every current index exactly once in `order`. Both require the owner revision and
+`expected_secondary_revision` from the collection. `remove` uses the exact item
+path and its revision from `get`. Each change previews first and commits with
+native undo only when `apply: true`.
+
+I support alternate names, surnames, addresses, attributes (including source and
+citation attributes), URLs, alternate place names and alternate locations.
+Attributes inside event/media references are supported. Reference arrays and
+styled-text tags retain their dedicated attachment/relationship/editor controls.
+New surnames default to non-primary when a surname already exists; multiple
+primary flags are rejected. Removing the last surname restores the native blank
+placeholder. Attached primary notes/citations remain separate records.
+
 `gramps_date` retains the original `{ "text": "1900" }` parse call. `options`
 discovers calendars/formats; `format` changes only the call's display;
 `compare` exposes native interval matching or complete representation
 `identity`. Native before/after/about windows are returned as conventions.
 `calendar` conversion and signed-day `offset` require exact complete dates,
 January-1 new year and no slash year, preserving recorded precision.
+For Gregorian/Julian `offset`, supply signed `years` and/or `months` instead of
+`days`. I combine them into one target month before applying `nonexistent_day:
+"reject"` (default) or `"clamp"`. For example, 31 January 2023 plus one month
+rejects by default or clamps to 28 February. BCE arithmetic crosses directly
+between 1 BCE and 1 CE. Calendar, original text and precision are retained.
+Month/year arithmetic for other calendars requires separately defined semantics.
 
 `gramps_navigation` activates a verified record and reads/moves through native
 history in an observed `nav_group`. `gramps_gramplets` controls the active view's
 sidebar/bottombar using compatible `available` IDs and `expected_revision`.
 Adding loads installed code and runs its lifecycle; a failed content load is
-reported and its new tab removed. I tested native bars with a synthetic Gramplet;
-individual third-party lifecycles and Dashboard layout remain native UI workflows.
+reported and its new tab removed. With `location: "dashboard"`, I expose separate
+`items` with unique `instance_id` values, titles, visible rows/columns and states.
+`add` uses an available plugin ID and can create multiple uniquely titled
+instances. `move` takes `instance_id`, zero-based `column` and insertion `row`;
+`state` takes `minimized`/`maximized`; `columns` accepts 1–10. `remove` closes the
+selected instance, and `restore` reopens an instance closed during this session.
+Every operation requires the current layout revision. Previously saved closed
+entries and detached windows retain their native UI controls. Layout changes use
+the native profile lifecycle and have no genealogy record undo. I tested bars
+and Dashboard with synthetic Gramplets, including failed-constructor callback
+cleanup. Individual third-party lifecycle side effects remain unverified.
 
 `gramps_settings` reads defaults and supports previewed `update` batches of
 1–50 keys, receipts and guarded rollback. These changes affect every tree in the
@@ -521,7 +552,7 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.7.0**, with **54 tools**.
+The plugin package and adapter/bridge API are **2.8.0**, with **54 tools**.
 
 | Check | Verified result |
 | --- | --- |
@@ -533,7 +564,7 @@ The plugin package and adapter/bridge API are **2.7.0**, with **54 tools**.
 | Installed menu and plugin routing | 155 actionable menu entries, 55 GUI tools and 62 GUI reports resolved in the tested configuration |
 | Bulk/archive expansion | 55 isolated native checks on synthetic data, including atomic failures, reference identity/indexes, wrong-tree rollback, saved-plan reuse and archive integrity |
 | Earlier plugin discovery | Version 2.2.1 exposed all 39 baseline tools; version 2.3.1 adds `gramps_batch` |
-| Dedicated integrations | 217 isolated native checks covering filters, privacy exports/backups, report bundles/media, graph/candidates, metadata, dates, typed/embedded edits, preference restoration, native history, Gramplet fixture and plugin visibility |
+| Dedicated integrations | 232 isolated native checks, including 15 unittest flows for typed detail lifecycles, date arithmetic and Dashboard controls, alongside filters, privacy exports/backups, reports, graphs, metadata and profile controls |
 | Web and portable paths | 38 offline mock API/path checks covering authentication, previews, conflicts, dependency guards, task states and platform/version paths |
 | Portable public package | Six grouped offline checks, including version consistency; fresh public installation and downloaded archive readback |
 
