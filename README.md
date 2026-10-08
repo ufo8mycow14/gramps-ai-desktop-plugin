@@ -107,15 +107,16 @@ On Windows, select 6.0 with `-GrampsVersion 6.0`; the default is 6.1.
 `--dry-run` / `-DryRun` reports the chosen paths without writing. The installer:
 
 1. Checks Python and compiles the adapter/bridge source.
-2. Installs the startup loader under the selected native add-on directory:
+2. Stages the local `.mcp.json` with the selected Python executable and any
+   explicit discovery directory before Codex caches the plugin.
+3. Registers this checkout's marketplace and installs
+   `gramps-desktop@gramps-desktop-plugins`.
+4. Writes the source locator and startup loader under the selected native
+   add-on directory:
    `%APPDATA%\gramps\gramps61\plugins\DesktopMCPControl` on Windows, or
    `$XDG_DATA_HOME/gramps/gramps61/plugins/DesktopMCPControl` on Linux/macOS
    (default `~/.local/share`). Version 6.0 uses `gramps60`. `GRAMPSHOME` and
    `--addon-dir` / `-AddonDirectory` provide explicit overrides.
-3. Writes a source locator and generates the local `.mcp.json` with the selected
-   Python executable.
-4. Registers this checkout's marketplace and installs
-   `gramps-desktop@gramps-desktop-plugins`.
 5. Enables the plugin in the target workspace's `.codex/config.toml`, preserving
    unrelated settings and removing a duplicate `gramps_desktop` standalone entry.
 
@@ -135,16 +136,18 @@ reports `connected: true`, `version_match: true` and `ready: true`. Do not share
 the connection discovery file: it contains the local bearer token.
 
 The installer disables known legacy plugin identities when selecting this package
-and preserves unrelated configuration. Registration precedes local loader writes;
-local write failure restores owned snapshots where possible, and rerunning the
-installer recovers an interrupted installation.
+and preserves unrelated configuration. Registration precedes local loader writes.
+If registration or a later file write fails, the installer restores its owned
+snapshots where possible and preserves concurrent edits. A registered package may
+remain after failure; rerunning installation recovers the local setup.
 `--runtime-dir` / `-RuntimeDirectory` binds the adapter and loader to an explicit
 absolute discovery directory when packaged hosts use another local AppData path.
 
 ### Automatic database access and lock recovery
 
-I use the database already opened by Gramps. Its active lock stays in place:
-the plugin accesses that same database on the application's GTK thread.
+I access the database through the running Gramps application, including when its
+open tree has an active lock. The plugin shares that database on the application's
+GTK thread, so repeated access does not open a competing database session.
 Reopening the same tree through the plugin reuses the shared database.
 
 When the exact selected or autoloaded tree has an abandoned lock, I recover it
@@ -153,11 +156,18 @@ SQLite tree directly under the configured database directory, a matching local
 user/host, no native recovery marker, no other Gramps process or database-file
 owner, and successful exclusive file checks. The opening handoff reserves the
 files and marker; failed or cancelled openings release the temporary guards.
+Early tree-creation failures also close the plugin-owned database connection
+before checking whether its abandoned marker can be recovered.
 
 Active owners, uncertain ownership, foreign locks, network locations, other
 backends and native recovery requirements remain blocked. I do not stop another
 process or break its lock. `gramps_status` reports the latest `lock_recovery`
 outcome. Recovery is installed by the startup add-on before native autoload.
+
+I verified the 2.9.0 recovery on 8 October 2026: an existing tree displayed as
+locked opened writable through the plugin without an unlock prompt. Subsequent
+access reused the same database and session. The adapter and bridge both reported
+2.9.0, health reported `ready: true`, and installed tool discovery returned 58 tools.
 
 ### Standalone MCP client
 
@@ -659,6 +669,7 @@ The plugin package and adapter/bridge API are **2.9.0**, with **58 tools**.
 | Web and portable paths | 38 offline mock API/path checks covering authentication, previews, conflicts, dependency guards, task states and platform/version paths |
 | Portable public package | Six grouped offline checks, including version consistency; fresh public installation and downloaded archive readback |
 | Version 2.9 additions | 41 native unittest methods, including 15 existing detail/date/Dashboard flows and 26 lifecycle/import/export/detail/lock flows; 24 installer/Windows lock methods, seven package/protocol groups and 38 offline Web/path checks |
+| Automatic database access | Existing locked tree opened writable without a manual unlock; repeated access reused the database/session; matching 2.9.0 adapter and bridge reported ready |
 
 I exercised structured writes on synthetic memory databases and disposable native
 SQLite trees. Live editor and
@@ -710,6 +721,13 @@ adapter/bridge versions: update or select the intended adapter when it is stale;
 save work and reopen Gramps when its loaded bridge is stale. For `dialogs_open`,
 finish or cancel the observed dialog. Reconnect the client if tools are missing
 after installation.
+
+For a locked tree, inspect `gramps_status.lock_recovery` after the exact native
+opening attempt. `shared_open_tree` means the plugin is using Gramps' open tree;
+an automatic recovery can also return this state with `recovered: true` after
+opening completes. `active_or_uncertain_owner` includes a reason or owner process
+IDs; resolve that ownership or native recovery requirement before opening.
+`reserved_for_native_open` is an opening in progress, so wait for its result.
 
 To remove the integration, disable `gramps-desktop@gramps-desktop-plugins` in
 the client's plugin settings and remove only its workspace configuration block.
