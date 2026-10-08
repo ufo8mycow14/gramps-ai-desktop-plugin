@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from gi.repository import Gtk, Gdk, GLib
 
 MAX_BODY = 1024 * 1024
-VERSION = "2.9.0"
+VERSION = "2.10.0"
 INSTANCE = None
 
 
@@ -715,7 +715,11 @@ class DesktopBridge:
             }
             output = io.StringIO()
             with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-                exec(compile(a["code"], "<gramps-desktop-plugin>", "exec"), env, env)
+                exec(
+                    compile(a["code"], "<gramps-codex-desktop-plugin>", "exec"),
+                    env,
+                    env,
+                )
             return {"result": env["result"], "output": output.getvalue()[:20000]}
         if method == "screenshot":
             w = self.resolve(a["window_id"])

@@ -13,6 +13,7 @@ import sys
 from typing import Any
 
 from configure import configure_text
+from clients import shared_runtime
 from platform_paths import addon_dir, SUPPORTED_GRAMPS
 
 LOG = logging.getLogger(__name__)
@@ -97,6 +98,7 @@ def install(
     dry_run: bool = False,
     codex: Path | str | None = None,
     runtime: Path | str | None = None,
+    bridge_only: bool = False,
 ) -> dict[str, Any]:
     """Register the package and install recoverable local loader/configuration."""
     source = Path(__file__).resolve().parent
@@ -105,10 +107,12 @@ def install(
         raise ValueError("The target workspace must exist")
     if version not in SUPPORTED_GRAMPS:
         raise ValueError("Supported installer targets are Gramps 6.0 and 6.1")
+    if bridge_only and standalone:
+        raise ValueError("Choose bridge-only or standalone installation")
     target = (Path(addon) if addon else addon_dir(version)).resolve()
-    runtime_path = Path(runtime) if runtime is not None else None
-    if runtime_path is not None and not runtime_path.is_absolute():
-        raise ValueError("The bridge runtime directory must be absolute")
+    runtime_path = shared_runtime(
+        Path(runtime) if runtime is not None else None, target
+    )
     marketplace = json.loads(
         (source / ".agents/plugins/marketplace.json").read_text(encoding="utf-8")
     )
@@ -117,15 +121,21 @@ def install(
     )
     identity = manifest["name"] + "@" + marketplace["name"]
     config = project / ".codex/config.toml"
-    original_config = config.read_bytes() if config.exists() else None
+    original_config = (
+        config.read_bytes() if not bridge_only and config.exists() else None
+    )
     original = original_config.decode("utf-8") if original_config is not None else ""
-    updated = configure_text(
-        original,
-        standalone,
-        Path(sys.executable),
-        source / "server.py",
-        identity,
-        runtime_path,
+    updated = (
+        original
+        if bridge_only
+        else configure_text(
+            original,
+            standalone,
+            Path(sys.executable),
+            source / "server.py",
+            identity,
+            runtime_path,
+        )
     )
     for name in ("DesktopControl.py", "DesktopControl.gpr.py"):
         existing = target / name
@@ -137,7 +147,7 @@ def install(
     for file in source.glob("*.py"):
         compile(file.read_text(encoding="utf-8"), file.name, "exec")
     executable = codex or shutil.which("codex")
-    if not standalone and not executable:
+    if not bridge_only and not standalone and not executable:
         raise ValueError(
             "Codex CLI with plugin commands is required; otherwise use --standalone"
         )
@@ -148,6 +158,8 @@ def install(
         "gramps_target": version,
         "dry_run": dry_run,
         "standalone": standalone,
+        "bridge_only": bridge_only,
+        "runtime": str(runtime_path),
     }
     if dry_run:
         return result
@@ -193,7 +205,27 @@ def install(
             "GRAMPS_DESKTOP_RUNTIME": str(runtime_path)
         }
     transport_path = source / ".mcp.json"
-    changes = {transport_path: json.dumps(transport, indent=2) + "\n", **changes}
+    if not bridge_only:
+        changes = {transport_path: json.dumps(transport, indent=2) + "\n", **changes}
+    # Claude resolves the cached plugin root; the interpreter and discovery path
+    # must agree with the native loader even in a packaged Windows host.
+    changes[source / "claude.mcp.json"] = (
+        json.dumps(
+            {
+                "gramps_desktop": {
+                    "type": "stdio",
+                    "command": str(Path(sys.executable).resolve()),
+                    "args": [
+                        "${CLAUDE_PLUGIN_ROOT}/server.py",
+                        "--runtime-dir",
+                        str(runtime_path),
+                    ],
+                }
+            },
+            indent=2,
+        )
+        + "\n"
+    )
 
     def register() -> None:
         """Cache the staged transport before changing the native loader."""
@@ -209,8 +241,8 @@ def install(
         changes[config] = updated
     write_files(
         changes,
-        staged_path=transport_path,
-        on_staged=None if standalone else register,
+        staged_path=None if bridge_only else transport_path,
+        on_staged=None if bridge_only or standalone else register,
         expected_snapshots={config: original_config} if config in changes else None,
     )
     result["local_files_committed"] = True
@@ -229,6 +261,11 @@ def main() -> None:
         "--addon-dir", type=Path, help="Override the native Gramps add-on directory"
     )
     parser.add_argument("--standalone", action="store_true")
+    parser.add_argument(
+        "--bridge-only",
+        action="store_true",
+        help="Install the Gramps add-on without Codex registration or settings",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--runtime-dir",
@@ -247,6 +284,7 @@ def main() -> None:
                 args.addon_dir,
                 args.dry_run,
                 runtime=args.runtime_dir,
+                bridge_only=args.bridge_only,
             )
         )
     )

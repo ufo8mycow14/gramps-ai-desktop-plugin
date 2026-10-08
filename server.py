@@ -11,9 +11,9 @@ import urllib.error
 import urllib.request
 from platform_paths import runtime_dir
 
-RUNTIME = runtime_dir() / "connection.json"
+RUNTIME: Path | None = None
 DEFAULT_EXE = os.environ.get("GRAMPS_EXECUTABLE", "")
-VERSION = "2.9.0"
+VERSION = "2.10.0"
 
 
 def schema(properties=None, required=None):
@@ -1036,7 +1036,9 @@ def validate(value, field, path="arguments"):
 
 
 def call_bridge(method, arguments, runtime=None):
-    runtime = RUNTIME if runtime is None else runtime
+    runtime = (
+        (RUNTIME or runtime_dir() / "connection.json") if runtime is None else runtime
+    )
     info = json.loads(runtime.read_text(encoding="utf-8"))
     # Never follow a modified discovery file to a remote server or HTTP redirect.
     from urllib.parse import urlparse
@@ -1065,7 +1067,9 @@ def call_bridge(method, arguments, runtime=None):
 
 
 def health(runtime=None):
-    runtime = RUNTIME if runtime is None else runtime
+    runtime = (
+        (RUNTIME or runtime_dir() / "connection.json") if runtime is None else runtime
+    )
     report = {
         "adapter_version": VERSION,
         "server_path": str(Path(__file__).resolve()),
@@ -1079,7 +1083,7 @@ def health(runtime=None):
     except FileNotFoundError:
         report.update(
             reason="discovery_missing",
-            next_action="Launch Gramps with the Gramps Desktop plugin bridge installed",
+            next_action="Launch Gramps with the Gramps Codex Desktop Plugin bridge installed",
         )
     except urllib.error.HTTPError as exc:
         report.update(
@@ -1251,7 +1255,7 @@ def handle(request):
         result = {
             "protocolVersion": requested if requested in supported else "2025-06-18",
             "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": {"name": "gramps-desktop", "version": VERSION},
+            "serverInfo": {"name": "gramps-codex-desktop-plugin", "version": VERSION},
             "instructions": "Controls the running Gramps GTK desktop and explicitly configured Gramps Web. Inspect before acting. "
             "Full access does not override project evidence, privacy or sole-master rules.",
         }
@@ -1327,6 +1331,11 @@ def main():
         if not options.runtime_dir.is_absolute():
             parser.error("The bridge runtime directory must be absolute")
         RUNTIME = options.runtime_dir / "connection.json"
+    else:
+        try:
+            RUNTIME = runtime_dir() / "connection.json"
+        except ValueError as error:
+            parser.error(str(error))
     if options.call:
         print(
             json.dumps(

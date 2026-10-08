@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2026  Gramps Desktop plugin contributors
+# Copyright (C) 2026  Gramps Codex Desktop Plugin contributors
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -196,8 +196,14 @@ class NativeLifecycle(unittest.TestCase):
     def test_failed_creation_releases_owned_native_connection(self) -> None:
         """An early schema error closes the connection created by this operation."""
         database = SQLite()
-        with patch.object(database, "_schema_exists", side_effect=OSError("synthetic early schema failure")), patch.object(database_support, "make_database", return_value=database):
-            receipt = self.execute({"operation": "create", "name": "Synthetic early failure"})
+        with patch.object(
+            database,
+            "_schema_exists",
+            side_effect=OSError("synthetic early schema failure"),
+        ), patch.object(database_support, "make_database", return_value=database):
+            receipt = self.execute(
+                {"operation": "create", "name": "Synthetic early failure"}
+            )
         self.assertEqual(receipt["outcome"], "failed")
         tree = Path(receipt["created"]["path"])
         (tree / "sqlite.db").read_bytes()

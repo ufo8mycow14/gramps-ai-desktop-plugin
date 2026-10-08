@@ -1,0 +1,9 @@
+{
+  "gramps_desktop": {
+    "type": "stdio",
+    "command": "python",
+    "args": [
+      "${CLAUDE_PLUGIN_ROOT}/server.py"
+    ]
+  }
+}

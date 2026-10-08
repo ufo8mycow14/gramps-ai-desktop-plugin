@@ -48,11 +48,13 @@ def main():
         "web_support.py",
         "platform_paths.py",
         "install.py",
+        "clients.py",
         "verify_batch.py",
         "verify_integrations.py",
         "verify_expansion.py",
         "test/detail_lifecycle_test.py",
         "test/installer_test.py",
+        "test/clients_test.py",
         "test/lock_recovery_test.py",
         "test/native_lock_opening_test.py",
         "test/native_batch_test.py",
@@ -93,6 +95,21 @@ def main():
     assert (root / manifest["mcpServers"]).is_file()
     assert (root / manifest["skills"] / "gramps/SKILL.md").is_file()
     checks.append("standalone_marketplace_and_plugin_paths")
+    claude = json.loads((root / ".claude-plugin/plugin.json").read_text())
+    claude_market = json.loads((root / ".claude-plugin/marketplace.json").read_text())
+    assert claude["name"] == manifest["name"]
+    assert claude["version"] == server.VERSION
+    assert claude_market["name"] == marketplace["name"]
+    assert claude_market["owner"]["name"]
+    assert claude_market["plugins"][0]["source"] == "./"
+    assert claude["skills"] == manifest["skills"]
+    claude_transport = json.loads((root / claude["mcpServers"]).read_text())
+    entry = claude_transport["gramps_desktop"]
+    assert entry["type"] == "stdio"
+    assert entry["args"][0] == "${CLAUDE_PLUGIN_ROOT}/server.py"
+    assert set(entry) <= {"type", "command", "args", "env"}
+    assert (root / "CLIENTS.md").is_file()
+    checks.append("claude_native_manifests_shared_skill_and_transport")
     unrelated = (
         '\n# Preserve unrelated settings\n[mcp_servers.other]\ncommand = "keep"\n'
     )

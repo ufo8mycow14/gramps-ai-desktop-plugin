@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2026  Gramps Desktop plugin contributors
+# Copyright (C) 2026  Gramps Codex Desktop Plugin contributors
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -255,6 +255,73 @@ class InstallerRecovery(unittest.TestCase):
                 ],
                 str(runtime),
             )
+
+    def test_bridge_only_preserves_client_settings_and_transport(self) -> None:
+        """Other clients can install the native bridge without Codex access."""
+        with tempfile.TemporaryDirectory() as temporary:
+            source, project, addon = self.fixture(Path(temporary))
+            config = project / ".codex/config.toml"
+            config.parent.mkdir()
+            config.write_text("invalid unrelated configuration [[\n")
+            runtime = Path(temporary) / "shared-runtime"
+            with patch.object(
+                install, "__file__", str(source / "install.py")
+            ), patch.object(install.shutil, "which", return_value=None), patch.object(
+                install,
+                "configure_text",
+                side_effect=AssertionError("Codex config read"),
+            ), patch.object(
+                install.subprocess, "run"
+            ) as registry:
+                result = install.install(
+                    project, addon=addon, runtime=runtime, bridge_only=True
+                )
+            registry.assert_not_called()
+            self.assertTrue(result["bridge_only"])
+            self.assertEqual(config.read_text(), "invalid unrelated configuration [[\n")
+            self.assertEqual((source / ".mcp.json").read_text(), "original transport\n")
+            self.assertEqual(
+                json.loads((addon / "bridge_source.json").read_text())["runtime"],
+                str(runtime),
+            )
+
+    def test_bridge_only_rejects_standalone_mode(self) -> None:
+        """Conflicting client modes fail before writing a loader."""
+        with tempfile.TemporaryDirectory() as temporary:
+            source, project, addon = self.fixture(Path(temporary))
+            with patch.object(install, "__file__", str(source / "install.py")):
+                with self.assertRaisesRegex(ValueError, "bridge-only or standalone"):
+                    install.install(
+                        project, addon=addon, bridge_only=True, standalone=True
+                    )
+            self.assertFalse((addon / "bridge_source.json").exists())
+
+    def test_bridge_only_reuses_installed_discovery_and_configures_claude(self) -> None:
+        """Native Claude and other clients retain the packaged host's discovery path."""
+        with tempfile.TemporaryDirectory() as temporary:
+            source, project, addon = self.fixture(Path(temporary))
+            runtime = Path(temporary) / "existing-runtime"
+            (addon / "bridge_source.json").write_text(
+                json.dumps({"runtime": str(runtime)})
+            )
+            with patch.object(install, "__file__", str(source / "install.py")):
+                result = install.install(project, addon=addon, bridge_only=True)
+            self.assertEqual(result["runtime"], str(runtime))
+            self.assertEqual(
+                json.loads((addon / "bridge_source.json").read_text())["runtime"],
+                str(runtime),
+            )
+            claude = json.loads((source / "claude.mcp.json").read_text())[
+                "gramps_desktop"
+            ]
+            self.assertEqual(
+                claude["command"], str(Path(install.sys.executable).resolve())
+            )
+            self.assertEqual(
+                claude["args"],
+                ["${CLAUDE_PLUGIN_ROOT}/server.py", "--runtime-dir", str(runtime)],
+            )
+            self.assertEqual((source / ".mcp.json").read_text(), "original transport\n")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,7 @@
+{
+  "name": "gramps-codex-desktop-plugins",
+  "owner": { "name": "ufo8mycow14" },
+  "plugins": [
+    { "name": "gramps-codex-desktop-plugin", "source": "./" }
+  ]
+}

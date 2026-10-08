@@ -10,9 +10,12 @@ FILES = (
     "README.md",
     "LICENSE",
     "CHANGELOG.md",
+    "CLIENTS.md",
     ".gitignore",
     ".codex-plugin/plugin.json",
     ".agents/plugins/marketplace.json",
+    ".claude-plugin/plugin.json",
+    ".claude-plugin/marketplace.json",
     "skills/gramps/SKILL.md",
     "server.py",
     "desktop_bridge.py",
@@ -40,6 +43,7 @@ FILES = (
     "web_support.py",
     "platform_paths.py",
     "install.py",
+    "clients.py",
     "verify_batch.py",
     "verify_integrations.py",
     "verify_expansion.py",
@@ -53,6 +57,7 @@ FILES = (
     "package_release.py",
     "test/detail_lifecycle_test.py",
     "test/installer_test.py",
+    "test/clients_test.py",
     "test/lock_recovery_test.py",
     "test/native_lock_opening_test.py",
     "test/native_batch_test.py",
@@ -91,18 +96,29 @@ def build(destination):
     (destination / ".mcp.json").write_text(
         json.dumps(transport, indent=2) + "\n", encoding="utf-8"
     )
+    # Both host transports must be portable; installed local paths stay private.
+    claude_transport = {
+        "gramps_desktop": {
+            "type": "stdio",
+            "command": "python",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/server.py"],
+        }
+    }
+    (destination / "claude.mcp.json").write_text(
+        json.dumps(claude_transport, indent=2) + "\n", encoding="utf-8"
+    )
     version = json.loads((destination / ".codex-plugin/plugin.json").read_text())[
         "version"
     ]
-    archive = destination.parent / ("gramps-desktop-plugin-" + version + ".zip")
+    archive = destination.parent / ("gramps-codex-desktop-plugin-" + version + ".zip")
     if archive.exists():
         raise ValueError("Existing archive preserved; use another destination parent")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
-        for name in (*FILES, ".mcp.json"):
-            bundle.write(destination / name, "gramps-desktop-plugin/" + name)
+        for name in (*FILES, ".mcp.json", "claude.mcp.json"):
+            bundle.write(destination / name, "gramps-codex-desktop-plugin/" + name)
     return {
         "version": version,
-        "files": len(FILES) + 1,
+        "files": len(FILES) + 2,
         "repository": str(destination),
         "archive": str(archive),
     }

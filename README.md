@@ -1,14 +1,20 @@
-# Gramps Desktop plugin
+# Gramps Codex Desktop Plugin
 
-I built this plugin to let Codex work with the **running Gramps desktop**:
+I built this plugin to let coding assistants work with the **running Gramps desktop**:
 its windows, menus, native editors and already-open family tree. I package it as
-a Codex plugin with a Gramps startup add-on and a dependency-free Python adapter.
-MCP supplies the tool transport and standalone-client integration.
+a Codex and Claude Code plugin with a Gramps startup add-on and a dependency-free
+Python adapter. I also provide local client configuration for Kimi Code CLI,
+Hermes Agent and OpenCode, including xAI/Grok through OpenCode's xAI provider.
+MCP supplies the tool transport across clients.
 
-**Release: 2.9.0 · 58 tools · GPL-2.0-or-later**
+**Release: 2.10.0 · 58 tools · GPL-2.0-or-later**
 
-[Download the release](https://github.com/ufo8mycow14/gramps-desktop-plugin/releases/latest)
-· [Report a problem](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues)
+I previously published this as Gramps Desktop plugin. The installer migrates
+those installations to the new plugin identity while preserving existing
+`gramps_*` tool names, native loader IDs and standalone client settings.
+
+[Download the release](https://github.com/ufo8mycow14/gramps-codex-desktop-plugin/releases/latest)
+· [Report a problem](https://github.com/ufo8mycow14/gramps-codex-desktop-plugin/issues)
 
 This is an independent community project. It is not an official Gramps add-on
 or endorsed by the Gramps maintainers. The tested desktop is **Windows, Gramps
@@ -74,10 +80,11 @@ external dependency, service access or a particular database state.
   Linux/macOS installation paths are covered by offline checks.
 - Python **3.11 or newer** for the external adapter and installer. No pip packages
   are required. Gramps supplies its own GTK and genealogy modules inside the app.
-- A Codex CLI that supports `codex plugin marketplace` and
+- For Codex, a CLI that supports `codex plugin marketplace` and
   `codex plugin add`. Plugin installation was checked with CLI **0.157.0**.
-- For another MCP client, use the standalone installation and configure its
-  stdio transport as described below. That client's integration is not verified.
+- For Claude Code, Kimi, Hermes, OpenCode or Grok, use bridge-only installation
+  and the [client setup guide](CLIENTS.md). Generated transports pass offline
+  MCP checks; execution inside those client applications remains unverified.
 
 ## Install
 
@@ -85,8 +92,8 @@ Save any work in Gramps first. Download and extract the release into a permanent
 folder, or clone it:
 
 ```powershell
-git clone https://github.com/ufo8mycow14/gramps-desktop-plugin.git
-Set-Location gramps-desktop-plugin
+git clone https://github.com/ufo8mycow14/gramps-codex-desktop-plugin.git
+Set-Location gramps-codex-desktop-plugin
 .\install.ps1 -Project 'C:\path\to\your\workspace'
 ```
 
@@ -110,7 +117,7 @@ On Windows, select 6.0 with `-GrampsVersion 6.0`; the default is 6.1.
 2. Stages the local `.mcp.json` with the selected Python executable and any
    explicit discovery directory before Codex caches the plugin.
 3. Registers this checkout's marketplace and installs
-   `gramps-desktop@gramps-desktop-plugins`.
+   `gramps-codex-desktop-plugin@gramps-codex-desktop-plugins`.
 4. Writes the source locator and startup loader under the selected native
    add-on directory:
    `%APPDATA%\gramps\gramps61\plugins\DesktopMCPControl` on Windows, or
@@ -171,6 +178,15 @@ access reused the same database and session. The adapter and bridge both reporte
 
 ### Standalone MCP client
 
+For **Claude Code, Kimi, Hermes, OpenCode or xAI/Grok**, use `-BridgeOnly` /
+`--bridge-only`, then native Claude packaging or `clients.py` to export the
+appropriate configuration. [Client setup](CLIENTS.md) includes the exact
+registration commands, native configuration locations, skill integration,
+shared discovery path and Grok provider setup. This route does not require
+Codex or change Codex settings.
+
+For a **standalone Codex MCP entry**:
+
 ```powershell
 .\install.ps1 -Standalone -Project 'C:\path\to\your\workspace'
 ```
@@ -186,7 +202,7 @@ an absolute Python executable and an absolute path to `server.py`, for example:
   "mcpServers": {
     "gramps_desktop": {
       "command": "C:/path/to/python.exe",
-      "args": ["C:/path/to/gramps-desktop-plugin/server.py"]
+      "args": ["C:/path/to/gramps-codex-desktop-plugin/server.py"]
     }
   }
 }
@@ -653,7 +669,10 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.9.0**, with **58 tools**.
+The plugin package and adapter/bridge API are **2.10.0**, with **58 tools**.
+Version 2.10.0 adds client packaging/configuration, branding and installation
+identity; the native workflow
+results below retain the checks performed for version 2.9.0.
 
 | Check | Verified result |
 | --- | --- |
@@ -669,6 +688,7 @@ The plugin package and adapter/bridge API are **2.9.0**, with **58 tools**.
 | Web and portable paths | 38 offline mock API/path checks covering authentication, previews, conflicts, dependency guards, task states and platform/version paths |
 | Portable public package | Six grouped offline checks, including version consistency; fresh public installation and downloaded archive readback |
 | Version 2.9 additions | 41 native unittest methods, including 15 existing detail/date/Dashboard flows and 26 lifecycle/import/export/detail/lock flows; 24 installer/Windows lock methods, seven package/protocol groups and 38 offline Web/path checks |
+| Version 2.10 client support | 37 offline client/installer/Windows-lock unittest methods; eight package/protocol groups; all five generated transports initialise and list 58 tools from another working directory |
 | Automatic database access | Existing locked tree opened writable without a manual unlock; repeated access reused the database/session; matching 2.9.0 adapter and bridge reported ready |
 
 I exercised structured writes on synthetic memory databases and disposable native
@@ -693,6 +713,9 @@ establish universal compatibility or a security audit.
   target server's API and matching native Gramps release.
 - Only one connected Gramps process per user discovery location is supported.
   Simultaneous instances can replace that locator.
+- Client schemas and generated local transports are checked. Native Claude
+  installation and actual Kimi/Hermes/OpenCode/Grok session tool use remain
+  unverified; see [client setup](CLIENTS.md) for registration and connection checks.
 
 ## Check the package
 
@@ -729,7 +752,7 @@ opening completes. `active_or_uncertain_owner` includes a reason or owner proces
 IDs; resolve that ownership or native recovery requirement before opening.
 `reserved_for_native_open` is an opening in progress, so wait for its result.
 
-To remove the integration, disable `gramps-desktop@gramps-desktop-plugins` in
+To remove the integration, disable `gramps-codex-desktop-plugin@gramps-codex-desktop-plugins` in
 the client's plugin settings and remove only its workspace configuration block.
 For standalone mode, remove only `[mcp_servers.gramps_desktop]`. Save work and
 close Gramps, then remove the add-on folder
@@ -739,7 +762,7 @@ to this plugin. Reopen Gramps normally. This does not remove your trees or media
 ## Contributing and licence
 
 I welcome reproducible installation reports and compatibility fixes. Open an
-[issue](https://github.com/ufo8mycow14/gramps-desktop-plugin/issues) with the
+[issue](https://github.com/ufo8mycow14/gramps-codex-desktop-plugin/issues) with the
 platform, Gramps/Python/client versions, exact operation and a redacted error.
 Use synthetic examples; exclude tree files, private screenshots, absolute personal
 paths and connection tokens. Run `verify_package.py` before submitting changes.

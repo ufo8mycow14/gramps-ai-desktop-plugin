@@ -1,11 +1,11 @@
 {
-  "name": "gramps-desktop",
-  "version": "2.9.0",
-  "description": "Control Gramps desktop records, graphs, metadata, Gramplets, filters, privacy exports, reports and configured Gramps Web.",
+  "name": "gramps-codex-desktop-plugin",
+  "version": "2.10.0",
+  "description": "Gramps Codex Desktop Plugin: Gramps windows, records, genealogy workflows and configured Gramps Web.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "Gramps Desktop",
+    "displayName": "Gramps Codex Desktop Plugin",
     "shortDescription": "Gramps windows, records and genealogy workflows"
   }
 }

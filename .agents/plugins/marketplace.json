@@ -1,10 +1,20 @@
 {
-  "name": "gramps-desktop-plugins",
-  "interface": {"displayName": "Gramps Desktop plugins"},
-  "plugins": [{
-    "name": "gramps-desktop",
-    "source": {"source": "local", "path": "./"},
-    "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
-    "category": "Productivity"
-  }]
+  "name": "gramps-codex-desktop-plugins",
+  "interface": {
+    "displayName": "Gramps Codex Desktop Plugin"
+  },
+  "plugins": [
+    {
+      "name": "gramps-codex-desktop-plugin",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
 }

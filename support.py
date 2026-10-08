@@ -10,7 +10,7 @@ from gramps.gen import lib
 from gramps.gen.db import DbTxn
 from gramps.gen.lib.json_utils import object_to_dict, data_to_object
 
-VERSION = "2.9.0"
+VERSION = "2.10.0"
 
 KINDS = {
     "person": "Person",

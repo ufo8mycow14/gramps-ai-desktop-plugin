@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.10.0 — 8 October 2026
+
+- Rename the product to Gramps Codex Desktop Plugin across documentation,
+  native labels, plugin metadata, GitHub links and downloadable packages.
+- Migrate existing installations to the new plugin and marketplace identity;
+  retain native loader IDs, tool names and standalone transport compatibility.
+- Add native Claude Code plugin/marketplace packaging and a separate transport.
+- Add absolute-path configuration and shell-quoted registration command exports
+  for Claude Code, Kimi CLI, Hermes Agent and OpenCode; support Grok coding through
+  OpenCode's xAI provider without changing models or provider credentials.
+- Add bridge-only installation without Codex configuration/registration. Reuse
+  installed explicit runtime discovery across clients and stage Claude settings.
+- Let explicit adapter runtime arguments override inherited environment settings
+  before resolving defaults, including malformed relative environment paths.
+- Check generated transports from another working directory with all 58 tools;
+  document actual client execution as unverified.
+
 ## 2.9.0 — 8 October 2026
 
 - Recover verified abandoned local Windows SQLite locks automatically on native
@@ -144,7 +161,7 @@
 
 ## 2.1.2 — 7 October 2026
 
-First public release of the Gramps Desktop plugin.
+First public release of the Gramps Codex Desktop Plugin.
 
 - Package the 36-tool desktop/database integration as a standalone repository.
 - Discover Python or accept an explicit Python executable and workspace path.

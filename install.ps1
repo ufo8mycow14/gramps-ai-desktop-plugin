@@ -5,6 +5,7 @@ param(
     [string]$AddonDirectory = '',
     [string]$RuntimeDirectory = '',
     [switch]$Standalone,
+    [switch]$BridgeOnly,
     [switch]$DryRun
 )
 $ErrorActionPreference = 'Stop'
@@ -24,9 +25,10 @@ if (-not $Python -or -not (Test-Path -LiteralPath $Python -PathType Leaf)) {
 }
 $installationArgs = @((Join-Path $PSScriptRoot 'install.py'), '--project', $Project, '--gramps-version', $GrampsVersion)
 if ($Standalone) { $installationArgs += '--standalone' }
+if ($BridgeOnly) { $installationArgs += '--bridge-only' }
 if ($DryRun) { $installationArgs += '--dry-run' }
 if ($AddonDirectory) { $installationArgs += @('--addon-dir', $AddonDirectory) }
 if ($RuntimeDirectory) { $installationArgs += @('--runtime-dir', $RuntimeDirectory) }
 & $Python @installationArgs
-if ($LASTEXITCODE -ne 0) { throw 'Gramps Desktop plugin installation failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'Gramps Codex Desktop Plugin installation failed.' }
 Write-Output 'Keep this checkout in place. Reconnect client tools after installation; save work before reopening Gramps.'

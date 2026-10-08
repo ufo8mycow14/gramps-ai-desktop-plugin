@@ -6,9 +6,13 @@ from pathlib import Path
 import re
 import tomllib
 
-PLUGIN = "gramps-desktop@family-tree-local"
+PLUGIN = "gramps-codex-desktop-plugin@gramps-codex-desktop-plugins"
 HEADER = '[plugins."' + PLUGIN + '"]'
-KNOWN_PLUGINS = (PLUGIN, "gramps-desktop@gramps-desktop-plugins")
+KNOWN_PLUGINS = (
+    PLUGIN,
+    "gramps-desktop@family-tree-local",
+    "gramps-desktop@gramps-desktop-plugins",
+)
 
 
 def set_enabled(text: str, header: str, enabled: bool, plugin_id: str = PLUGIN) -> str:

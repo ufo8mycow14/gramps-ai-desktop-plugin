@@ -1,10 +1,14 @@
 ---
 name: gramps
-description: Control the installed Gramps desktop, inspect or edit its open database, and use native genealogy workflows through the Gramps Desktop plugin.
+description: Control the installed Gramps desktop, inspect or edit its open database, and use native genealogy workflows through the Gramps Codex Desktop Plugin.
 ---
 
-Use the plugin's `gramps_*` tools for the installed Gramps desktop. Installation
-targets 6.0/6.1; native execution is verified on Windows 6.1. The
+Use the plugin's `gramps_*` tools for the installed Gramps desktop. I support
+Codex, Claude Code and local MCP clients (Kimi, Hermes, OpenCode and
+Grok through OpenCode's xAI provider); see the package's CLIENTS.md. Use each
+client's discovered tool namespace. All clients share the same native session;
+coordinate writes and inspect current revisions before applying changes.
+Installation targets 6.0/6.1; native execution is verified on Windows 6.1. The
 Gramps startup add-on shares the application's open database and GTK main thread.
 Read `gramps_health`, `gramps_status` and `gramps_capabilities` first. Health works
 with Gramps closed and flags bridge version/startup/dialog problems without
