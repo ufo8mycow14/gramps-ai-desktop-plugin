@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.10.1 — 8 October 2026
+
+- Rename the product, package identity, GitHub repository and README to
+  **Gramps AI Desktop Plugin**.
+- Preserve the previous Gramps Codex Desktop Plugin identity as an installer
+  migration alias so existing installations can move safely.
+- Refresh public release links, Claude marketplace commands and archive naming.
+
 ## 2.10.0 — 8 October 2026
 
 - Rename the product to Gramps Codex Desktop Plugin across documentation,

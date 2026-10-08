@@ -110,12 +110,12 @@ def build(destination):
     version = json.loads((destination / ".codex-plugin/plugin.json").read_text())[
         "version"
     ]
-    archive = destination.parent / ("gramps-codex-desktop-plugin-" + version + ".zip")
+    archive = destination.parent / ("gramps-ai-desktop-plugin-" + version + ".zip")
     if archive.exists():
         raise ValueError("Existing archive preserved; use another destination parent")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
         for name in (*FILES, ".mcp.json", "claude.mcp.json"):
-            bundle.write(destination / name, "gramps-codex-desktop-plugin/" + name)
+            bundle.write(destination / name, "gramps-ai-desktop-plugin/" + name)
     return {
         "version": version,
         "files": len(FILES) + 2,

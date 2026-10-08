@@ -79,15 +79,15 @@ and a Claude-specific transport file. After bridge-only installation, register
 the same local directory so Claude caches the selected Python/runtime settings:
 
 ```text
-claude plugin marketplace add /absolute/path/to/gramps-codex-desktop-plugin
-claude plugin install gramps-codex-desktop-plugin@gramps-codex-desktop-plugins
+claude plugin marketplace add /absolute/path/to/gramps-ai-desktop-plugin
+claude plugin install gramps-ai-desktop-plugin@gramps-ai-desktop-plugins
 ```
 
 On Windows, use the quoted absolute extracted-directory path. The public
 marketplace can also be registered with:
 
 ```text
-claude plugin marketplace add ufo8mycow14/gramps-codex-desktop-plugin
+claude plugin marketplace add ufo8mycow14/gramps-ai-desktop-plugin
 ```
 
 The public transport uses `python` on PATH and the default discovery location.

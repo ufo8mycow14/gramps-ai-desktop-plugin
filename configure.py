@@ -6,10 +6,11 @@ from pathlib import Path
 import re
 import tomllib
 
-PLUGIN = "gramps-codex-desktop-plugin@gramps-codex-desktop-plugins"
+PLUGIN = "gramps-ai-desktop-plugin@gramps-ai-desktop-plugins"
 HEADER = '[plugins."' + PLUGIN + '"]'
 KNOWN_PLUGINS = (
     PLUGIN,
+    "gramps-codex-desktop-plugin@gramps-codex-desktop-plugins",
     "gramps-desktop@family-tree-local",
     "gramps-desktop@gramps-desktop-plugins",
 )

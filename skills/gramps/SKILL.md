@@ -1,6 +1,6 @@
 ---
 name: gramps
-description: Control the installed Gramps desktop, inspect or edit its open database, and use native genealogy workflows through the Gramps Codex Desktop Plugin.
+description: Control the installed Gramps desktop, inspect or edit its open database, and use native genealogy workflows through the Gramps AI Desktop Plugin.
 ---
 
 Use the plugin's `gramps_*` tools for the installed Gramps desktop. I support

@@ -1,13 +1,18 @@
 {
   "mcpServers": {
     "gramps_desktop": {
-      "command": "python",
+      "command": "C:\\Users\\kaoro\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
       "args": [
-        "server.py"
+        "server.py",
+        "--runtime-dir",
+        "C:\\Users\\kaoro\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\GrampsDesktopMCP"
       ],
       "cwd": ".",
       "startup_timeout_sec": 15,
-      "tool_timeout_sec": 60
+      "tool_timeout_sec": 120,
+      "env": {
+        "GRAMPS_DESKTOP_RUNTIME": "C:\\Users\\kaoro\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\GrampsDesktopMCP"
+      }
     }
   }
 }

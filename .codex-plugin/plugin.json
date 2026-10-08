@@ -1,11 +1,11 @@
 {
-  "name": "gramps-codex-desktop-plugin",
-  "version": "2.10.0",
-  "description": "Gramps Codex Desktop Plugin: Gramps windows, records, genealogy workflows and configured Gramps Web.",
+  "name": "gramps-ai-desktop-plugin",
+  "version": "2.10.1",
+  "description": "Gramps AI Desktop Plugin: Gramps windows, records, genealogy workflows and configured Gramps Web.",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "Gramps Codex Desktop Plugin",
+    "displayName": "Gramps AI Desktop Plugin",
     "shortDescription": "Gramps windows, records and genealogy workflows"
   }
 }

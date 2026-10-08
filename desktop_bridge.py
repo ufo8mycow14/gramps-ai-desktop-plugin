@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from gi.repository import Gtk, Gdk, GLib
 
 MAX_BODY = 1024 * 1024
-VERSION = "2.10.0"
+VERSION = "2.10.1"
 INSTANCE = None
 
 
@@ -716,7 +716,7 @@ class DesktopBridge:
             output = io.StringIO()
             with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
                 exec(
-                    compile(a["code"], "<gramps-codex-desktop-plugin>", "exec"),
+                    compile(a["code"], "<gramps-ai-desktop-plugin>", "exec"),
                     env,
                     env,
                 )

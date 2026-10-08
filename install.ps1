@@ -30,5 +30,5 @@ if ($DryRun) { $installationArgs += '--dry-run' }
 if ($AddonDirectory) { $installationArgs += @('--addon-dir', $AddonDirectory) }
 if ($RuntimeDirectory) { $installationArgs += @('--runtime-dir', $RuntimeDirectory) }
 & $Python @installationArgs
-if ($LASTEXITCODE -ne 0) { throw 'Gramps Codex Desktop Plugin installation failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'Gramps AI Desktop Plugin installation failed.' }
 Write-Output 'Keep this checkout in place. Reconnect client tools after installation; save work before reopening Gramps.'

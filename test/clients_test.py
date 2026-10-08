@@ -134,7 +134,7 @@ class ClientContracts(unittest.TestCase):
                     self.assertEqual(result.stderr, "")
                     self.assertEqual(
                         replies[0]["result"]["serverInfo"]["name"],
-                        "gramps-codex-desktop-plugin",
+                        "gramps-ai-desktop-plugin",
                     )
                     self.assertEqual(len(replies[1]["result"]["tools"]), 58)
                     diagnostic = json.loads(replies[2]["result"]["content"][0]["text"])[

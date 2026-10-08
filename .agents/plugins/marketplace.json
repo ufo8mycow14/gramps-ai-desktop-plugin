@@ -1,11 +1,11 @@
 {
-  "name": "gramps-codex-desktop-plugins",
+  "name": "gramps-ai-desktop-plugins",
   "interface": {
-    "displayName": "Gramps Codex Desktop Plugin"
+    "displayName": "Gramps AI Desktop Plugin"
   },
   "plugins": [
     {
-      "name": "gramps-codex-desktop-plugin",
+      "name": "gramps-ai-desktop-plugin",
       "source": {
         "source": "local",
         "path": "./"

@@ -1,20 +1,20 @@
-# Gramps Codex Desktop Plugin
+# Gramps AI Desktop Plugin
 
 I built this plugin to let coding assistants work with the **running Gramps desktop**:
 its windows, menus, native editors and already-open family tree. I package it as
-a Codex and Claude Code plugin with a Gramps startup add-on and a dependency-free
+a Codex, Claude Code and AI client plugin with a Gramps startup add-on and a dependency-free
 Python adapter. I also provide local client configuration for Kimi Code CLI,
 Hermes Agent and OpenCode, including xAI/Grok through OpenCode's xAI provider.
 MCP supplies the tool transport across clients.
 
-**Release: 2.10.0 · 58 tools · GPL-2.0-or-later**
+**Release: 2.10.1 · 58 tools · GPL-2.0-or-later**
 
 I previously published this as Gramps Desktop plugin. The installer migrates
 those installations to the new plugin identity while preserving existing
 `gramps_*` tool names, native loader IDs and standalone client settings.
 
-[Download the release](https://github.com/ufo8mycow14/gramps-codex-desktop-plugin/releases/latest)
-· [Report a problem](https://github.com/ufo8mycow14/gramps-codex-desktop-plugin/issues)
+[Download the release](https://github.com/ufo8mycow14/gramps-ai-desktop-plugin/releases/latest)
+· [Report a problem](https://github.com/ufo8mycow14/gramps-ai-desktop-plugin/issues)
 
 This is an independent community project. It is not an official Gramps add-on
 or endorsed by the Gramps maintainers. The tested desktop is **Windows, Gramps
@@ -92,8 +92,8 @@ Save any work in Gramps first. Download and extract the release into a permanent
 folder, or clone it:
 
 ```powershell
-git clone https://github.com/ufo8mycow14/gramps-codex-desktop-plugin.git
-Set-Location gramps-codex-desktop-plugin
+git clone https://github.com/ufo8mycow14/gramps-ai-desktop-plugin.git
+Set-Location gramps-ai-desktop-plugin
 .\install.ps1 -Project 'C:\path\to\your\workspace'
 ```
 
@@ -117,7 +117,7 @@ On Windows, select 6.0 with `-GrampsVersion 6.0`; the default is 6.1.
 2. Stages the local `.mcp.json` with the selected Python executable and any
    explicit discovery directory before Codex caches the plugin.
 3. Registers this checkout's marketplace and installs
-   `gramps-codex-desktop-plugin@gramps-codex-desktop-plugins`.
+   `gramps-ai-desktop-plugin@gramps-ai-desktop-plugins`.
 4. Writes the source locator and startup loader under the selected native
    add-on directory:
    `%APPDATA%\gramps\gramps61\plugins\DesktopMCPControl` on Windows, or
@@ -202,7 +202,7 @@ an absolute Python executable and an absolute path to `server.py`, for example:
   "mcpServers": {
     "gramps_desktop": {
       "command": "C:/path/to/python.exe",
-      "args": ["C:/path/to/gramps-codex-desktop-plugin/server.py"]
+      "args": ["C:/path/to/gramps-ai-desktop-plugin/server.py"]
     }
   }
 }
@@ -669,8 +669,9 @@ automatically update an external GEDCOM or an online tree.
 ## Verified coverage
 
 I tested the plugin with **Windows Gramps AIO64-6.1.0-beta2-1 and GTK 3.24.52**.
-The plugin package and adapter/bridge API are **2.10.0**, with **58 tools**.
-Version 2.10.0 adds client packaging/configuration, branding and installation
+The plugin package and adapter/bridge API are **2.10.1**, with **58 tools**.
+Version 2.10.1 updates the product and repository name to Gramps AI Desktop Plugin;
+the previous 2.10.0 release added client packaging/configuration and installation
 identity; the native workflow
 results below retain the checks performed for version 2.9.0.
 
@@ -752,7 +753,7 @@ opening completes. `active_or_uncertain_owner` includes a reason or owner proces
 IDs; resolve that ownership or native recovery requirement before opening.
 `reserved_for_native_open` is an opening in progress, so wait for its result.
 
-To remove the integration, disable `gramps-codex-desktop-plugin@gramps-codex-desktop-plugins` in
+To remove the integration, disable `gramps-ai-desktop-plugin@gramps-ai-desktop-plugins` in
 the client's plugin settings and remove only its workspace configuration block.
 For standalone mode, remove only `[mcp_servers.gramps_desktop]`. Save work and
 close Gramps, then remove the add-on folder
@@ -762,7 +763,7 @@ to this plugin. Reopen Gramps normally. This does not remove your trees or media
 ## Contributing and licence
 
 I welcome reproducible installation reports and compatibility fixes. Open an
-[issue](https://github.com/ufo8mycow14/gramps-codex-desktop-plugin/issues) with the
+[issue](https://github.com/ufo8mycow14/gramps-ai-desktop-plugin/issues) with the
 platform, Gramps/Python/client versions, exact operation and a redacted error.
 Use synthetic examples; exclude tree files, private screenshots, absolute personal
 paths and connection tokens. Run `verify_package.py` before submitting changes.

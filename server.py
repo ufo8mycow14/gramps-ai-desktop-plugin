@@ -13,7 +13,7 @@ from platform_paths import runtime_dir
 
 RUNTIME: Path | None = None
 DEFAULT_EXE = os.environ.get("GRAMPS_EXECUTABLE", "")
-VERSION = "2.10.0"
+VERSION = "2.10.1"
 
 
 def schema(properties=None, required=None):
@@ -1083,7 +1083,7 @@ def health(runtime=None):
     except FileNotFoundError:
         report.update(
             reason="discovery_missing",
-            next_action="Launch Gramps with the Gramps Codex Desktop Plugin bridge installed",
+            next_action="Launch Gramps with the Gramps AI Desktop Plugin bridge installed",
         )
     except urllib.error.HTTPError as exc:
         report.update(
@@ -1255,7 +1255,7 @@ def handle(request):
         result = {
             "protocolVersion": requested if requested in supported else "2025-06-18",
             "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": {"name": "gramps-codex-desktop-plugin", "version": VERSION},
+            "serverInfo": {"name": "gramps-ai-desktop-plugin", "version": VERSION},
             "instructions": "Controls the running Gramps GTK desktop and explicitly configured Gramps Web. Inspect before acting. "
             "Full access does not override project evidence, privacy or sole-master rules.",
         }

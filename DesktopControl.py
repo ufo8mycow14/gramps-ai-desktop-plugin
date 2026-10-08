@@ -11,7 +11,7 @@ SETTINGS = json.loads(
 SOURCE = Path(SETTINGS["source"])
 if not SOURCE.is_absolute() or not SOURCE.is_file():
     raise RuntimeError(
-        "Gramps Codex Desktop Plugin bridge source missing; rerun its installer from the current tools directory"
+        "Gramps AI Desktop Plugin bridge source missing; rerun its installer from the current tools directory"
     )
 _spec = importlib.util.spec_from_file_location("gramps_desktop_bridge", SOURCE)
 _bridge = importlib.util.module_from_spec(_spec)
@@ -29,6 +29,6 @@ class DesktopControl(Gramplet):
             self.dbstate, self.uistate, runtime=SETTINGS.get("runtime")
         )
         self.set_text(
-            "Gramps Codex Desktop Plugin connected locally. Session: "
+            "Gramps AI Desktop Plugin connected locally. Session: "
             + instance.session[:12]
         )

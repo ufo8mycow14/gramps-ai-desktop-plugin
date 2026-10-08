@@ -1,10 +1,10 @@
 {
-  "name": "gramps-codex-desktop-plugin",
-  "version": "2.10.0",
-  "description": "Gramps Codex Desktop Plugin: control Gramps windows, records and native genealogy workflows.",
+  "name": "gramps-ai-desktop-plugin",
+  "version": "2.10.1",
+  "description": "Gramps AI Desktop Plugin: control Gramps windows, records and native genealogy workflows.",
   "author": { "name": "ufo8mycow14" },
-  "homepage": "https://github.com/ufo8mycow14/gramps-codex-desktop-plugin",
-  "repository": "https://github.com/ufo8mycow14/gramps-codex-desktop-plugin",
+  "homepage": "https://github.com/ufo8mycow14/gramps-ai-desktop-plugin",
+  "repository": "https://github.com/ufo8mycow14/gramps-ai-desktop-plugin",
   "license": "GPL-2.0-or-later",
   "skills": "./skills/",
   "mcpServers": "./claude.mcp.json"
